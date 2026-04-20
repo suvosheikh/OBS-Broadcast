@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { supabase } from './lib/supabase';
 import ControlPanel from './components/ControlPanel';
 import Overlay from './components/Overlay';
+import ImageOverlay from './components/ImageOverlay';
 import Login from './components/Login';
 import { User } from '@supabase/supabase-js';
 
@@ -42,6 +43,8 @@ export default function App() {
         {/* Public Overlay Routes */}
         <Route path="/overlay/:userId" element={<Overlay />} />
         <Route path="/overlay" element={<Overlay />} />
+        <Route path="/imgoverlay/:userId" element={<ImageOverlay />} />
+        <Route path="/imgoverlay" element={<ImageOverlay />} />
         
         {/* Admin Routes */}
         <Route 

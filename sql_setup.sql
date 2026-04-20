@@ -49,3 +49,28 @@ CREATE POLICY "Allow public read for visible items"
   ON broadcast_items
   FOR SELECT
   USING (is_visible = true);
+
+-- New Table for 16:9 Image Overlay Settings
+CREATE TABLE IF NOT EXISTS image_overlays (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  image_url TEXT,
+  location_name TEXT DEFAULT 'Ryans Operations Office',
+  footer_heading TEXT DEFAULT 'Our team is actively working to serve you better.',
+  footer_description TEXT DEFAULT 'Ensuring faster support & service for customers across Bangladesh.',
+  is_active BOOLEAN DEFAULT true,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE image_overlays ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own image overlays"
+  ON image_overlays
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Allow public read for active image overlays"
+  ON image_overlays
+  FOR SELECT
+  USING (is_active = true);

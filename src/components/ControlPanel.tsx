@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   Copy,
   Clock,
-  Package
+  Package,
+  Users,
+  Image as ImageIcon
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
 
@@ -42,10 +44,25 @@ interface ToastHistory {
   content: Product;
 }
 
+interface ImageOverlaySettings {
+  image_url: string;
+  location_name: string;
+  footer_heading: string;
+  footer_description: string;
+  is_active: boolean;
+}
+
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image'>('dashboard');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
+    image_url: '',
+    location_name: 'Ryans Operations Office',
+    footer_heading: 'Our team is actively working to serve you better.',
+    footer_description: 'Ensuring faster support & service for customers across Bangladesh.',
+    is_active: true
+  });
   const [product, setProduct] = useState<Product>({
     product_name: '',
     sku: '',
@@ -65,7 +82,37 @@ export default function ControlPanel({ user }: { user: User }) {
     fetchStats();
     fetchHistory();
     fetchProducts();
+    fetchImageOverlay();
   }, [user.id]);
+
+  async function fetchImageOverlay() {
+    const { data } = await supabase
+      .from('image_overlays')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (data) {
+      setImageOverlay(data);
+    }
+  }
+
+  async function saveImageOverlay() {
+    const { error } = await supabase
+      .from('image_overlays')
+      .upsert({
+        user_id: user.id,
+        ...imageOverlay,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+    
+    if (!error) {
+      alert("Overlay Image Settings Saved!");
+    } else {
+      console.error(error);
+      alert("Failed to save settings.");
+    }
+  }
 
   async function fetchStats() {
     const today = new Date();
@@ -241,6 +288,7 @@ export default function ControlPanel({ user }: { user: User }) {
         <nav className="flex-1 px-4 space-y-2 mt-4">
           <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem tab="overlay-input" icon={Eye} label="Overlay Engine" />
+          <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
         </nav>
 
         <div className="p-6 border-t border-slate-50 space-y-4">
@@ -283,6 +331,7 @@ export default function ControlPanel({ user }: { user: User }) {
 
         {activeTab === 'dashboard' ? (
           <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-12">
+            {/* Dashboard Content ... */}
             <div>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">System Performance</h2>
               <p className="text-slate-500 mt-2">Real-time telemetry and data metrics from your broadcast station.</p>
@@ -336,6 +385,124 @@ export default function ControlPanel({ user }: { user: User }) {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        ) : activeTab === 'overlay-image' ? (
+          <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
+            <div>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Overlay Image</h2>
+              <p className="text-slate-500 mt-2">Manage your 16:9 cinematic overlay with custom text fields.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+               {/* Config Form */}
+               <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-8">
+                  <div className="space-y-6">
+                    <FormInput 
+                      label="Background Image URL (16:9)" 
+                      placeholder="https://images.unsplash.com/photo-..."
+                      value={imageOverlay.image_url} 
+                      onChange={v => setImageOverlay({...imageOverlay, image_url: v})} 
+                    />
+                    <FormInput 
+                      label="Location Name" 
+                      value={imageOverlay.location_name} 
+                      onChange={v => setImageOverlay({...imageOverlay, location_name: v})} 
+                    />
+                    <FormInput 
+                      label="Footer Heading" 
+                      value={imageOverlay.footer_heading} 
+                      onChange={v => setImageOverlay({...imageOverlay, footer_heading: v})} 
+                    />
+                    <FormInput 
+                      label="Footer Description" 
+                      value={imageOverlay.footer_description} 
+                      onChange={v => setImageOverlay({...imageOverlay, footer_description: v})} 
+                    />
+                    
+                    <div className="flex items-center gap-3 pt-2">
+                       <input 
+                         type="checkbox" 
+                         id="overlay-active" 
+                         checked={imageOverlay.is_active}
+                         onChange={e => setImageOverlay({...imageOverlay, is_active: e.target.checked})}
+                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                       />
+                       <label htmlFor="overlay-active" className="text-xs font-bold text-slate-600 uppercase tracking-widest">Active on Stream</label>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100 flex gap-4">
+                    <button 
+                      onClick={saveImageOverlay}
+                      className="flex-1 bg-blue-600 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-blue-700 transition-all text-[10px] flex items-center justify-center gap-3 shadow-lg shadow-blue-100"
+                    >
+                      <Save className="w-4 h-4" /> Save Configuration
+                    </button>
+                    <button 
+                      onClick={() => window.open(`${getAppUrl()}/imgoverlay`, '_blank')}
+                      className="px-6 bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all text-[10px] flex items-center justify-center gap-3"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Live
+                    </button>
+                  </div>
+               </div>
+
+               {/* Visual Preview */}
+               <div className="space-y-6">
+                  <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Cinematic Preview</p>
+                  <div className="aspect-video bg-slate-950 rounded-2xl relative overflow-hidden shadow-2xl border border-slate-800">
+                     {imageOverlay.image_url ? (
+                       <img src={imageOverlay.image_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Preview" referrerPolicy="no-referrer" />
+                     ) : (
+                       <div className="absolute inset-0 flex items-center justify-center text-slate-700 font-bold uppercase tracking-widest text-[10px]">No Background Loaded</div>
+                     )}
+                     
+                     <div className="absolute top-4 left-4 scale-[0.4] origin-top-left space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-red-600 px-4 py-2 flex items-center gap-2 rounded-lg">
+                            <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                            <span className="text-white font-black tracking-widest text-xl uppercase">LIVE</span>
+                          </div>
+                          <h1 className="text-white text-4xl font-bold tracking-tight">{imageOverlay.location_name} (Live)</h1>
+                        </div>
+                        <div className="bg-slate-900/90 border border-white/10 p-6 rounded-xl w-fit">
+                           <div className="flex items-center gap-4">
+                              <Clock className="w-10 h-10 text-white" />
+                              <div className="text-white text-5xl font-black tabular-nums tracking-tighter">04:04 <span className="text-2xl opacity-60 font-medium">PM</span></div>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="absolute bottom-0 left-0 right-0 p-4 scale-[0.4] origin-bottom-left w-[250%]">
+                        <div className="bg-slate-950/90 border-t border-white/10 p-10 flex items-center gap-8">
+                           <div className="w-16 h-16 bg-blue-600/20 rounded-full border border-blue-500/30 flex items-center justify-center">
+                             <Users className="w-10 h-10 text-white" />
+                           </div>
+                           <div>
+                              <h2 className="text-white text-4xl font-black mb-1">{imageOverlay.footer_heading}</h2>
+                              <p className="text-white/60 text-xl font-medium">{imageOverlay.footer_description}</p>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl">
+                     <p className="text-[10px] uppercase font-bold tracking-widest text-blue-600 mb-2">Station Authority</p>
+                     <div className="flex items-center gap-3">
+                        <code className="flex-1 bg-white p-3 rounded-lg border border-blue-100 text-[10px] font-mono text-blue-800">{getAppUrl()}/imgoverlay</code>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${getAppUrl()}/imgoverlay`);
+                            alert("Link Copied!");
+                          }}
+                          className="bg-white p-3 rounded-lg border border-blue-100 text-blue-600 hover:bg-blue-50 transition-all"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                     </div>
+                  </div>
+               </div>
             </div>
           </div>
         ) : (
