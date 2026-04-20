@@ -39,8 +39,9 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Overlay Route - Accessible via /overlay/:userId */}
+        {/* Public Overlay Routes */}
         <Route path="/overlay/:userId" element={<Overlay />} />
+        <Route path="/overlay" element={<Overlay />} />
         
         {/* Admin Routes */}
         <Route 

@@ -273,7 +273,7 @@ export default function ControlPanel({ user }: { user: User }) {
               <CheckCircle2 className="w-3 h-3" /> System Live
             </div>
             <button 
-              onClick={() => window.open(`${getAppUrl()}/overlay/${user.id}`, '_blank')}
+              onClick={() => window.open(`${getAppUrl()}/overlay`, '_blank')}
               className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
             >
               <ExternalLink className="w-4 h-4" /> Live Preview
@@ -550,7 +550,7 @@ export default function ControlPanel({ user }: { user: User }) {
                       <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Stream Authority</p>
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`${getAppUrl()}/overlay/${user.id}`);
+                          navigator.clipboard.writeText(`${getAppUrl()}/overlay`);
                           alert("Station Link Copied!");
                         }}
                         className="text-[11px] font-bold text-blue-600 flex items-center gap-2 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg transition-colors border border-slate-100"
@@ -559,10 +559,10 @@ export default function ControlPanel({ user }: { user: User }) {
                       </button>
                     </div>
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-50 overflow-hidden">
-                      <code className="text-[10px] font-mono text-slate-500 break-all leading-relaxed">{getAppUrl()}/overlay/{user.id}</code>
+                      <code className="text-[10px] font-mono text-slate-500 break-all leading-relaxed">{getAppUrl()}/overlay</code>
                     </div>
                     <p className="text-[9px] text-slate-400 leading-relaxed italic border-t border-slate-50 pt-4">
-                      Connect this source to OBS Studio or vMix using standard 1920x1080 canvas dimensions.
+                      Connect this source to OBS Studio or vMix using standard 1920x1080 resolution. This static link will display all broadcast events.
                     </p>
                   </div>
                 </div>
