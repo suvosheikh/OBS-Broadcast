@@ -25,18 +25,23 @@ export default function ImageOverlay() {
 
   useEffect(() => {
     async function fetchSettings() {
-      const query = supabase
+      let query = supabase
         .from('image_overlays')
         .select('*')
         .eq('is_active', true);
       
       if (userId) {
-        query.eq('user_id', userId);
+        query = query.eq('user_id', userId);
+      } else {
+        // If no userId, get the most recently updated active one
+        query = query.order('updated_at', { ascending: false }).limit(1);
       }
 
       const { data, error } = await query.maybeSingle();
       if (!error && data) {
         setSettings(data);
+      } else if (error) {
+        console.error("Error fetching overlay settings:", error);
       }
     }
 
@@ -88,7 +93,7 @@ export default function ImageOverlay() {
         <img 
           src={settings.image_url} 
           alt="Overlay Background" 
-          className="absolute inset-0 w-full h-full object-cover opacity-90"
+          className="absolute inset-0 w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
       )}

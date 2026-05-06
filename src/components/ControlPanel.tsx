@@ -23,6 +23,7 @@ import {
   Clock,
   Package,
   Users,
+  Trophy,
   Image as ImageIcon
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
@@ -52,10 +53,26 @@ interface ImageOverlaySettings {
   is_active: boolean;
 }
 
+interface WinnerData {
+  id?: string;
+  subject: string;
+  bill_no: string;
+  gift_name: string;
+  is_visible: boolean;
+  created_at?: string;
+}
+
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner'>('dashboard');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [winners, setWinners] = useState<WinnerData[]>([]);
+  const [winnerForm, setWinnerForm] = useState<WinnerData>({
+    subject: '',
+    bill_no: '',
+    gift_name: '',
+    is_visible: true
+  });
   const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
     image_url: '',
     location_name: 'Ryans Operations Office',
@@ -83,7 +100,68 @@ export default function ControlPanel({ user }: { user: User }) {
     fetchHistory();
     fetchProducts();
     fetchImageOverlay();
+    fetchWinners();
   }, [user.id]);
+
+  async function fetchWinners() {
+    const { data, error } = await supabase
+      .from('winners')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching winners:", error);
+      // Only alert if it's a real error, not just an empty result
+      if (error.code !== 'PGRST116') { // PGRST116 is often 'no rows' but sometimes table missing
+         // alert(`Database Error: ${error.message}. Please ensure the 'winners' table exists.`);
+      }
+    } else {
+      setWinners(data || []);
+    }
+  }
+
+  async function saveWinner() {
+    if (!winnerForm.subject || !winnerForm.bill_no || !winnerForm.gift_name) {
+      alert("Please fill all fields: Subject, Bill No, and Gift Name.");
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('winners')
+      .insert([{ 
+        subject: winnerForm.subject,
+        bill_no: winnerForm.bill_no,
+        gift_name: winnerForm.gift_name,
+        is_visible: winnerForm.is_visible,
+        user_id: user.id 
+      }]);
+    
+    if (!error) {
+      alert("Winner added successfully!");
+      setWinnerForm({ subject: '', bill_no: '', gift_name: '', is_visible: true });
+      fetchWinners();
+    } else {
+      console.error("Supabase Error (Winners):", error);
+      alert(`Error saving winner: ${error.message}\n\nHint: Ensure the 'winners' table is created in your Supabase SQL editor.`);
+    }
+  }
+
+  async function deleteWinner(id: string) {
+    if (!confirm('Are you sure?')) return;
+    await supabase.from('winners').delete().eq('id', id);
+    fetchWinners();
+  }
+
+  async function toggleWinnerVisibility(id: string, current: boolean) {
+    const { error } = await supabase.from('winners').update({ is_visible: !current }).eq('id', id);
+    if (error) {
+      console.error("Toggle Error:", error);
+      alert(`Failed to update visibility: ${error.message}`);
+    } else {
+      fetchWinners();
+    }
+  }
 
   async function fetchImageOverlay() {
     const { data } = await supabase
@@ -181,7 +259,11 @@ export default function ControlPanel({ user }: { user: User }) {
         .from('products')
         .insert([{ ...product, user_id: user.id }]);
       
-      if (error) alert(error.message);
+      if (error) {
+        alert(error.message);
+      } else {
+        alert("Product added successfully!");
+      }
     }
 
     resetForm();
@@ -289,6 +371,7 @@ export default function ControlPanel({ user }: { user: User }) {
           <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem tab="overlay-input" icon={Eye} label="Overlay Engine" />
           <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
+          <NavItem tab="overlay-winner" icon={Trophy} label="Overlay Winner" />
         </nav>
 
         <div className="p-6 border-t border-slate-50 space-y-4">
@@ -503,6 +586,171 @@ export default function ControlPanel({ user }: { user: User }) {
                      </div>
                   </div>
                </div>
+            </div>
+          </div>
+        ) : activeTab === 'overlay-winner' ? (
+          <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
+            <div>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Winner Management</h2>
+              <p className="text-slate-500 mt-2">Manage the list of winners for the live broadcast overlay.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+              {/* Form and List */}
+              <div className="space-y-8">
+                {/* Entry Form */}
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center font-black text-xs">NEW</div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Add New Winner</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                       <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">Subject / Event</label>
+                       <input 
+                         id="winner-subject"
+                         placeholder="e.g. Weekly Raffle"
+                         value={winnerForm.subject}
+                         onChange={e => setWinnerForm({...winnerForm, subject: e.target.value})}
+                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">Winner Bill No</label>
+                       <input 
+                         id="winner-bill"
+                         placeholder="e.g. 123456"
+                         value={winnerForm.bill_no}
+                         onChange={e => setWinnerForm({...winnerForm, bill_no: e.target.value})}
+                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                       />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">Gift Name</label>
+                     <input 
+                       id="winner-gift"
+                       placeholder="e.g. Smartphone"
+                       value={winnerForm.gift_name}
+                       onChange={e => setWinnerForm({...winnerForm, gift_name: e.target.value})}
+                       className="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                     />
+                  </div>
+
+                  <button 
+                    id="add-winner-btn"
+                    onClick={saveWinner}
+                    disabled={!winnerForm.subject || !winnerForm.bill_no || !winnerForm.gift_name}
+                    className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-30 text-[10px] flex items-center justify-center gap-3 shadow-xl"
+                  >
+                    <Plus className="w-4 h-4" /> Add to List
+                  </button>
+                </div>
+
+                {/* Active Winners Table */}
+                <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                  <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Current Winners</h3>
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {winners.length === 0 ? (
+                      <div className="p-12 text-center text-slate-300 italic text-sm">No winners recorded</div>
+                    ) : (
+                      winners.map((w) => (
+                        <div key={w.id} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                              w.is_visible ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"
+                            )}>
+                              <Trophy className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{w.bill_no}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{w.gift_name} • {w.subject}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => toggleWinnerVisibility(w.id!, w.is_visible)}
+                               className={cn(
+                                 "p-2 rounded-lg border transition-all",
+                                 w.is_visible ? "bg-green-50 border-green-200 text-green-600" : "bg-slate-50 border-slate-200 text-slate-400"
+                               )}
+                               title={w.is_visible ? "Hide for Overlay" : "Show for Overlay"}
+                             >
+                               <Eye className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => deleteWinner(w.id!)}
+                               className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-400 hover:text-red-600 transition-all"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Area */}
+              <div className="space-y-6">
+                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Live Overlay Preview</p>
+                <div className="aspect-video bg-slate-950 rounded-3xl relative overflow-hidden shadow-2xl border border-white/5 flex flex-col items-center justify-center p-12">
+                   {/* Background pattern */}
+                   <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
+                   
+                   <div className="z-10 w-full max-w-sm space-y-4">
+                      <AnimatePresence mode="popLayout">
+                        {winners.filter(w => w.is_visible).slice(0, 3).map((w, i) => (
+                           <motion.div
+                             key={w.id}
+                             initial={{ opacity: 0, x: -20 }}
+                             animate={{ opacity: 1, x: 0 }}
+                             exit={{ opacity: 0, x: 20 }}
+                             className="bg-slate-900/90 border-l-4 border-amber-500 p-4 shadow-xl flex items-center gap-4"
+                           >
+                             <div className="p-2 bg-amber-500/10 rounded-full">
+                               <Trophy className="w-5 h-5 text-amber-500" />
+                             </div>
+                             <div>
+                               <p className="text-[8px] text-amber-500 font-black uppercase tracking-widest">{w.subject}</p>
+                               <h4 className="text-white text-lg font-black italic">Bill: {w.bill_no}</h4>
+                               <p className="text-white/40 text-[10px] font-medium uppercase tracking-tight">Gift: {w.gift_name}</p>
+                             </div>
+                           </motion.div>
+                        ))}
+                      </AnimatePresence>
+                   </div>
+                   
+                   {winners.filter(w => w.is_visible).length === 0 && (
+                     <div className="text-white/10 flex flex-col items-center gap-4">
+                        <Trophy className="w-16 h-16" />
+                        <p className="text-[10px] font-bold uppercase tracking-[0.4em]">Broadcast Station Standby</p>
+                     </div>
+                   )}
+                </div>
+
+                <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl">
+                   <p className="text-[10px] uppercase font-bold tracking-widest text-amber-600 mb-2">Overlay Authority</p>
+                   <div className="flex items-center gap-3">
+                      <code className="flex-1 bg-white p-3 rounded-lg border border-amber-100 text-[10px] font-mono text-amber-800">{getAppUrl()}/winner/{user.id}</code>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${getAppUrl()}/winner/${user.id}`);
+                          alert("Link Copied!");
+                        }}
+                        className="bg-white p-3 rounded-lg border border-amber-100 text-amber-600 hover:bg-amber-50 transition-all shadow-sm"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : (

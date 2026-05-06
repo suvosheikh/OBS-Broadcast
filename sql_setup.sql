@@ -53,7 +53,7 @@ CREATE POLICY "Allow public read for visible items"
 -- New Table for 16:9 Image Overlay Settings
 CREATE TABLE IF NOT EXISTS image_overlays (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   image_url TEXT,
   location_name TEXT DEFAULT 'Ryans Operations Office',
   footer_heading TEXT DEFAULT 'Our team is actively working to serve you better.',
@@ -74,3 +74,65 @@ CREATE POLICY "Allow public read for active image overlays"
   ON image_overlays
   FOR SELECT
   USING (is_active = true);
+
+-- New Table for Overlay Winner
+CREATE TABLE IF NOT EXISTS winners (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  bill_no TEXT NOT NULL,
+  gift_name TEXT NOT NULL,
+  is_visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE winners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own winners"
+  ON winners
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Allow public read for visible winners"
+  ON winners
+  FOR SELECT
+  USING (is_visible = true);
+
+-- New Table for Products (Overlay Engine Assets)
+CREATE TABLE IF NOT EXISTS products (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  product_name TEXT NOT NULL,
+  sku TEXT,
+  price TEXT,
+  discount TEXT,
+  product_short_description TEXT,
+  branch_name TEXT,
+  branch_location TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own products"
+  ON products
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- New Table for Toast History (Recent Transmissions)
+CREATE TABLE IF NOT EXISTS toast_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  content JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE toast_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own toast history"
+  ON toast_history
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
