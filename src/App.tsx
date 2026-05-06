@@ -5,6 +5,7 @@ import ControlPanel from './components/ControlPanel';
 import Overlay from './components/Overlay';
 import ImageOverlay from './components/ImageOverlay';
 import WinnerOverlay from './components/WinnerOverlay';
+import BranchTickerOverlay from './components/BranchTickerOverlay';
 import Login from './components/Login';
 import { User } from '@supabase/supabase-js';
 
@@ -48,6 +49,8 @@ export default function App() {
         <Route path="/imgoverlay" element={<ImageOverlay />} />
         <Route path="/winner/:userId" element={<WinnerOverlay />} />
         <Route path="/winner" element={<WinnerOverlay />} />
+        <Route path="/branchaddress/:userId" element={<BranchTickerOverlay />} />
+        <Route path="/branchaddress" element={<BranchTickerOverlay />} />
         
         {/* Admin Routes */}
         <Route 

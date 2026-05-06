@@ -131,8 +131,30 @@ CREATE TABLE IF NOT EXISTS toast_history (
 
 ALTER TABLE toast_history ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage their own toast history"
-  ON toast_history
   FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- New Table for Branch Address Ticker
+CREATE TABLE IF NOT EXISTS branch_ticker (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  top_message TEXT NOT NULL,
+  bottom_message TEXT NOT NULL,
+  branch_name TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE branch_ticker ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own branch ticker"
+  ON branch_ticker
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Allow public read for active branch ticker"
+  ON branch_ticker
+  FOR SELECT
+  USING (is_active = true);

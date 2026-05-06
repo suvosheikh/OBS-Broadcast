@@ -24,7 +24,8 @@ import {
   Package,
   Users,
   Trophy,
-  Image as ImageIcon
+  Image as ImageIcon,
+  MapPin,
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
 
@@ -62,8 +63,16 @@ interface WinnerData {
   created_at?: string;
 }
 
+interface Branch {
+  id?: string;
+  top_message: string;
+  bottom_message: string;
+  branch_name: string;
+  is_active: boolean;
+}
+
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner' | 'branch-address'>('dashboard');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [winners, setWinners] = useState<WinnerData[]>([]);
@@ -72,6 +81,13 @@ export default function ControlPanel({ user }: { user: User }) {
     bill_no: '',
     gift_name: '',
     is_visible: true
+  });
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchForm, setBranchForm] = useState<Branch>({
+    top_message: '',
+    bottom_message: '',
+    branch_name: '',
+    is_active: true
   });
   const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
     image_url: '',
@@ -101,7 +117,46 @@ export default function ControlPanel({ user }: { user: User }) {
     fetchProducts();
     fetchImageOverlay();
     fetchWinners();
+    fetchBranches();
   }, [user.id]);
+
+  async function fetchBranches() {
+    const { data } = await supabase
+      .from('branch_ticker')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    setBranches(data || []);
+  }
+
+  async function saveBranch() {
+    if (!branchForm.top_message || !branchForm.bottom_message || !branchForm.branch_name) {
+      alert("Please fill all fields.");
+      return;
+    }
+    const { error } = await supabase
+      .from('branch_ticker')
+      .insert([{ ...branchForm, user_id: user.id }]);
+    
+    if (!error) {
+      alert("Branch added successfully!");
+      setBranchForm({ top_message: '', bottom_message: '', branch_name: '', is_active: true });
+      fetchBranches();
+    } else {
+      alert(error.message);
+    }
+  }
+
+  async function deleteBranch(id: string) {
+    if (!confirm('Are you sure?')) return;
+    await supabase.from('branch_ticker').delete().eq('id', id);
+    fetchBranches();
+  }
+
+  async function toggleBranchStatus(id: string, current: boolean) {
+    await supabase.from('branch_ticker').update({ is_active: !current }).eq('id', id);
+    fetchBranches();
+  }
 
   async function fetchWinners() {
     const { data, error } = await supabase
@@ -372,6 +427,7 @@ export default function ControlPanel({ user }: { user: User }) {
           <NavItem tab="overlay-input" icon={Eye} label="Overlay Engine" />
           <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
           <NavItem tab="overlay-winner" icon={Trophy} label="Overlay Winner" />
+          <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
         </nav>
 
         <div className="p-6 border-t border-slate-50 space-y-4">
@@ -750,6 +806,146 @@ export default function ControlPanel({ user }: { user: User }) {
                       </button>
                    </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'branch-address' ? (
+          <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
+            <div>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Branch Address Ticker</h2>
+              <p className="text-slate-500 mt-2">Manage your branch ticker messages for the live broadcast ticker overlay.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+              <div className="space-y-8">
+                {/* Branch Entry Form */}
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-50 text-green-600 rounded-lg flex items-center justify-center font-black text-xs">NEW</div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Add New Ticker Item</p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <FormInput 
+                      label="Branch Name" 
+                      placeholder="e.g. Multiplan Center"
+                      value={branchForm.branch_name} 
+                      onChange={v => setBranchForm({...branchForm, branch_name: v})} 
+                    />
+                    <FormInput 
+                      label="Top Message (Green Line)" 
+                      placeholder="e.g. Continuous power, everywhere"
+                      value={branchForm.top_message} 
+                      onChange={v => setBranchForm({...branchForm, top_message: v})} 
+                    />
+                    <FormInput 
+                      label="Bottom Message (Blue Line)" 
+                      placeholder="e.g. Buy a microwave and win a scratch card!"
+                      value={branchForm.bottom_message} 
+                      onChange={v => setBranchForm({...branchForm, bottom_message: v})} 
+                    />
+                  </div>
+
+                  <button 
+                    onClick={saveBranch}
+                    className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all text-[10px] flex items-center justify-center gap-3 shadow-xl"
+                  >
+                    <Plus className="w-4 h-4" /> Add to Ticker
+                  </button>
+                </div>
+
+                {/* Ticker List */}
+                <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                  <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Ticker Items</h3>
+                    <MapPin className="w-4 h-4 text-green-500" />
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {branches.length === 0 ? (
+                      <div className="p-12 text-center text-slate-300 italic text-sm">No ticker items found</div>
+                    ) : (
+                      branches.map((b) => (
+                        <div key={b.id} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                              b.is_active ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-400"
+                            )}>
+                              <MapPin className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{b.branch_name}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate max-w-xs">{b.bottom_message}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => toggleBranchStatus(b.id!, b.is_active)}
+                               className={cn(
+                                 "p-2 rounded-lg border transition-all",
+                                 b.is_active ? "bg-green-50 border-green-200 text-green-600" : "bg-slate-50 border-slate-200 text-slate-400"
+                               )}
+                             >
+                               <Eye className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => deleteBranch(b.id!)}
+                               className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-400 hover:text-red-600 transition-all"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Area */}
+              <div className="space-y-6">
+                 <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Ticker Live Preview</p>
+                 <div className="aspect-video bg-slate-900 rounded-3xl relative overflow-hidden shadow-2xl border border-white/5 flex flex-col justify-end p-0">
+                    <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none">
+                       {/* Top Line */}
+                       <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
+                          <div className="w-[80px] bg-[#004a99] h-full flex items-center justify-center">
+                             <span className="text-white font-black text-[10px] italic">নোটিশ</span>
+                          </div>
+                          <div className="flex-1 px-4 text-white text-[10px] font-bold truncate">
+                             {branchForm.top_message || 'Ticker Message Top'}
+                          </div>
+                       </div>
+                       {/* Bottom Line */}
+                       <div className="h-1/2 bg-[#004a99] flex items-center">
+                          <div className="w-[80px] bg-[#00a651] h-full flex items-center justify-center text-center">
+                             <span className="text-white font-bold text-[8px] px-1 whitespace-nowrap overflow-hidden">{branchForm.branch_name || 'Branch'}</span>
+                          </div>
+                          <div className="flex-1 px-4 text-white text-[8px] font-medium truncate">
+                             {branchForm.bottom_message || 'Ticker Message Bottom'}
+                          </div>
+                          <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
+                             <span className="text-slate-900 font-bold text-[10px]">08:10 PM</span>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="bg-green-50 border border-green-100 p-6 rounded-2xl">
+                    <p className="text-[10px] uppercase font-bold tracking-widest text-green-600 mb-2">Overlay Link</p>
+                    <div className="flex items-center gap-3">
+                       <code className="flex-1 bg-white p-3 rounded-lg border border-green-100 text-[10px] font-mono text-green-800">{getAppUrl()}/branchaddress/{user.id}</code>
+                       <button 
+                         onClick={() => {
+                           navigator.clipboard.writeText(`${getAppUrl()}/branchaddress/${user.id}`);
+                           alert("Link copied!");
+                         }}
+                         className="bg-white p-3 rounded-lg border border-green-100 text-green-600 hover:bg-green-50 transition-all shadow-sm"
+                       >
+                         <Copy className="w-4 h-4" />
+                       </button>
+                    </div>
+                 </div>
               </div>
             </div>
           </div>
