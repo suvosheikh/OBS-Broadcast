@@ -63,8 +63,9 @@ interface WinnerData {
   created_at?: string;
 }
 
-interface Branch {
+interface TickerItem {
   id?: string;
+  type: 'notice' | 'branch';
   top_message: string;
   bottom_message: string;
   branch_name: string;
@@ -82,11 +83,14 @@ export default function ControlPanel({ user }: { user: User }) {
     gift_name: '',
     is_visible: true
   });
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [branchForm, setBranchForm] = useState<Branch>({
-    top_message: '',
-    bottom_message: '',
-    branch_name: '',
+  const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
+  const [noticeForm, setNoticeForm] = useState({
+    content: '',
+    is_active: true
+  });
+  const [branchForm, setBranchForm] = useState({
+    name: '',
+    address: '',
     is_active: true
   });
   const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
@@ -133,24 +137,44 @@ export default function ControlPanel({ user }: { user: User }) {
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-    setBranches(data || []);
+    setTickerItems(data || []);
   }
 
-  async function saveBranch() {
-    if (!branchForm.top_message || !branchForm.bottom_message || !branchForm.branch_name) {
-      alert("Please fill all fields.");
-      return;
-    }
+  async function saveNotice() {
+    if (!noticeForm.content) return;
     const { error } = await supabase
       .from('branch_ticker')
-      .insert([{ ...branchForm, user_id: user.id }]);
+      .insert([{ 
+        type: 'notice',
+        top_message: noticeForm.content,
+        branch_name: '',
+        bottom_message: '',
+        is_active: noticeForm.is_active,
+        user_id: user.id 
+      }]);
     
     if (!error) {
-      alert("Branch added successfully!");
-      setBranchForm({ top_message: '', bottom_message: '', branch_name: '', is_active: true });
+      setNoticeForm({ content: '', is_active: true });
       fetchBranches();
-    } else {
-      alert(error.message);
+    }
+  }
+
+  async function saveBranchAddress() {
+    if (!branchForm.name || !branchForm.address) return;
+    const { error } = await supabase
+      .from('branch_ticker')
+      .insert([{ 
+        type: 'branch',
+        branch_name: branchForm.name,
+        bottom_message: branchForm.address,
+        top_message: '',
+        is_active: branchForm.is_active,
+        user_id: user.id 
+      }]);
+    
+    if (!error) {
+      setBranchForm({ name: '', address: '', is_active: true });
+      fetchBranches();
     }
   }
 
@@ -819,117 +843,117 @@ export default function ControlPanel({ user }: { user: User }) {
         ) : activeTab === 'branch-address' ? (
           <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
             <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Branch Address Ticker</h2>
-              <p className="text-slate-500 mt-2">Manage your branch ticker messages for the live broadcast ticker overlay.</p>
+              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ticker Segments</h2>
+              <p className="text-slate-500 mt-2">Independently manage Notice and Branch address segments for your live ticker.</p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
-              <div className="space-y-8">
-                {/* Branch Entry Form */}
-                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-50 text-green-600 rounded-lg flex items-center justify-center font-black text-xs">NEW</div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Add New Ticker Item</p>
+              <div className="space-y-12">
+                {/* NOTICE SEGMENT */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-4">
                     <FormInput 
-                      label="Branch Name" 
-                      placeholder="e.g. Multiplan Center"
-                      value={branchForm.branch_name} 
-                      onChange={v => setBranchForm({...branchForm, branch_name: v})} 
+                      label="Notice Text" 
+                      placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
+                      value={noticeForm.content} 
+                      onChange={v => setNoticeForm({...noticeForm, content: v})} 
                     />
-                    <FormInput 
-                      label="Top Message (Green Line)" 
-                      placeholder="e.g. Continuous power, everywhere"
-                      value={branchForm.top_message} 
-                      onChange={v => setBranchForm({...branchForm, top_message: v})} 
-                    />
-                    <FormInput 
-                      label="Bottom Message (Blue Line)" 
-                      placeholder="e.g. Buy a microwave and win a scratch card!"
-                      value={branchForm.bottom_message} 
-                      onChange={v => setBranchForm({...branchForm, bottom_message: v})} 
-                    />
-                  </div>
-
-                  <button 
-                    onClick={saveBranch}
-                    className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all text-[10px] flex items-center justify-center gap-3 shadow-xl"
-                  >
-                    <Plus className="w-4 h-4" /> Add to Ticker
-                  </button>
-                </div>
-
-                {/* Ticker List */}
-                <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-                  <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Ticker Items</h3>
-                    <MapPin className="w-4 h-4 text-green-500" />
-                  </div>
-                  <div className="divide-y divide-slate-50">
-                    {branches.length === 0 ? (
-                      <div className="p-12 text-center text-slate-300 italic text-sm">No ticker items found</div>
-                    ) : (
-                      branches.map((b) => (
-                        <div key={b.id} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className={cn(
-                              "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-                              b.is_active ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-400"
-                            )}>
-                              <MapPin className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">{b.branch_name}</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate max-w-xs">{b.bottom_message}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                             <button 
-                               onClick={() => toggleBranchStatus(b.id!, b.is_active)}
-                               className={cn(
-                                 "p-2 rounded-lg border transition-all",
-                                 b.is_active ? "bg-green-50 border-green-200 text-green-600" : "bg-slate-50 border-slate-200 text-slate-400"
-                               )}
-                             >
-                               <Eye className="w-4 h-4" />
-                             </button>
-                             <button 
-                               onClick={() => deleteBranch(b.id!)}
-                               className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-400 hover:text-red-600 transition-all"
-                             >
-                               <Trash2 className="w-4 h-4" />
-                             </button>
+                    <button 
+                      onClick={saveNotice}
+                      className="w-full bg-[#00a651] text-white font-black uppercase tracking-widest py-3 rounded-xl hover:opacity-90 transition-all text-[10px]"
+                    >
+                      Add Notice
+                    </button>
+                    
+                    <div className="divide-y divide-slate-50 border-t border-slate-50 mt-4">
+                      {tickerItems.filter(i => i.type === 'notice').map(item => (
+                        <div key={item.id} className="py-3 flex items-center justify-between">
+                          <p className="text-xs font-medium text-slate-700 truncate max-w-[200px]">{item.top_message}</p>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                              className={cn("p-1.5 rounded-lg border", item.is_active ? "bg-green-50 text-green-600 border-green-100" : "bg-slate-50 text-slate-400 border-slate-100")}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => deleteBranch(item.id!)} className="p-1.5 text-red-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* BRANCH SEGMENT */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#004a99] rounded-full" />
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
+                  </div>
+                  
+                  <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput label="Branch Name" value={branchForm.name} onChange={v => setBranchForm({...branchForm, name: v})} />
+                      <FormInput label="Branch Address" value={branchForm.address} onChange={v => setBranchForm({...branchForm, address: v})} />
+                    </div>
+                    <button 
+                      onClick={saveBranchAddress}
+                      className="w-full bg-[#004a99] text-white font-black uppercase tracking-widest py-3 rounded-xl hover:opacity-90 transition-all text-[10px]"
+                    >
+                      Add Branch
+                    </button>
+
+                    <div className="divide-y divide-slate-50 border-t border-slate-50 mt-4">
+                      {tickerItems.filter(i => i.type === 'branch').map(item => (
+                        <div key={item.id} className="py-3 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{item.branch_name}</p>
+                            <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{item.bottom_message}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                              className={cn("p-1.5 rounded-lg border", item.is_active ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-400 border-slate-100")}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => deleteBranch(item.id!)} className="p-1.5 text-red-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Preview Area */}
               <div className="space-y-6">
-                 <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Ticker Live Preview</p>
+                 <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Live Engine Preview</p>
                  <div className="aspect-video bg-slate-900 rounded-3xl relative overflow-hidden shadow-2xl border border-white/5 flex flex-col justify-end p-0">
                     <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none">
-                       {/* Top Line */}
+                       {/* Top Line - Shows Active Notice */}
                        <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
                           <div className="w-[80px] bg-[#004a99] h-full flex items-center justify-center">
                              <span className="text-white font-black text-[10px] italic">নোটিশ</span>
                           </div>
                           <div className="flex-1 px-4 text-white text-[10px] font-bold truncate">
-                             {branchForm.top_message || 'Ticker Message Top'}
+                             {tickerItems.find(i => i.type === 'notice' && i.is_active)?.top_message || noticeForm.content || '...'}
                           </div>
                        </div>
-                       {/* Bottom Line */}
+                       {/* Bottom Line - Shows Active Branch */}
                        <div className="h-1/2 bg-[#004a99] flex items-center">
                           <div className="w-[80px] bg-[#00a651] h-full flex items-center justify-center text-center">
-                             <span className="text-white font-bold text-[8px] px-1 whitespace-nowrap overflow-hidden">{branchForm.branch_name || 'Branch'}</span>
+                             <span className="text-white font-bold text-[8px] px-1 whitespace-nowrap overflow-hidden">
+                               {tickerItems.find(i => i.type === 'branch' && i.is_active)?.branch_name || branchForm.name || 'BRANCH'}
+                             </span>
                           </div>
                           <div className="flex-1 px-4 text-white text-[8px] font-medium truncate">
-                             {branchForm.bottom_message || 'Ticker Message Bottom'}
+                             {tickerItems.find(i => i.type === 'branch' && i.is_active)?.bottom_message || branchForm.address || 'Address Area'}
                           </div>
                           <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
                              <span className="text-slate-900 font-bold text-[10px]">
@@ -940,16 +964,16 @@ export default function ControlPanel({ user }: { user: User }) {
                     </div>
                  </div>
 
-                 <div className="bg-green-50 border border-green-100 p-6 rounded-2xl">
-                    <p className="text-[10px] uppercase font-bold tracking-widest text-green-600 mb-2">Overlay Link</p>
+                 <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl">
+                    <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Overlay Source URL</p>
                     <div className="flex items-center gap-3">
-                       <code className="flex-1 bg-white p-3 rounded-lg border border-green-100 text-[10px] font-mono text-green-800">{getAppUrl()}/branchaddress/{user.id}</code>
+                       <code className="flex-1 bg-white p-3 rounded-lg border border-slate-100 text-[10px] font-mono text-slate-600">{getAppUrl()}/branchaddress/{user.id}</code>
                        <button 
                          onClick={() => {
                            navigator.clipboard.writeText(`${getAppUrl()}/branchaddress/${user.id}`);
                            alert("Link copied!");
                          }}
-                         className="bg-white p-3 rounded-lg border border-green-100 text-green-600 hover:bg-green-50 transition-all shadow-sm"
+                         className="bg-white p-3 rounded-lg border border-slate-100 text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
                        >
                          <Copy className="w-4 h-4" />
                        </button>
