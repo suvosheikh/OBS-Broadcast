@@ -34,7 +34,7 @@ export default function BranchTickerOverlay() {
       const { data } = await query;
       const allItems = (data || []) as TickerItem[];
       setNotices(allItems.filter(i => i.type === 'notice'));
-      setBranches(allItems.filter(i => i.type === 'branch'));
+      setBranches(allItems.filter(i => i.type === 'branch' || !i.type));
     }
 
     fetchItems();
@@ -44,9 +44,14 @@ export default function BranchTickerOverlay() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'branch_ticker' },
-        () => fetchItems()
+        (payload) => {
+          console.log("Realtime update received:", payload);
+          fetchItems();
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
 
     const timer = setInterval(() => setTime(new Date()), 1000);
 

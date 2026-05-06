@@ -139,6 +139,7 @@ ALTER TABLE toast_history ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS branch_ticker (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT DEFAULT 'branch',
   top_message TEXT NOT NULL,
   bottom_message TEXT NOT NULL,
   branch_name TEXT,
