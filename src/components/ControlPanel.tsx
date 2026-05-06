@@ -106,6 +106,13 @@ export default function ControlPanel({ user }: { user: User }) {
     branch_location: '',
   });
   
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [history, setHistory] = useState<ToastHistory[]>([]);
   const [savedProducts, setSavedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -925,7 +932,9 @@ export default function ControlPanel({ user }: { user: User }) {
                              {branchForm.bottom_message || 'Ticker Message Bottom'}
                           </div>
                           <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
-                             <span className="text-slate-900 font-bold text-[10px]">08:10 PM</span>
+                             <span className="text-slate-900 font-bold text-[10px]">
+                               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                             </span>
                           </div>
                        </div>
                     </div>
