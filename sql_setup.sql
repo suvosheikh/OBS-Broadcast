@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS branch_ticker (
   top_message TEXT NOT NULL,
   bottom_message TEXT NOT NULL,
   branch_name TEXT,
+  phone_number TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

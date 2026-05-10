@@ -6,6 +6,7 @@ import {
   Plus, 
   Trash2, 
   Eye, 
+  EyeOff,
   Settings, 
   LogOut, 
   ExternalLink,
@@ -69,6 +70,7 @@ interface TickerItem {
   top_message: string;
   bottom_message: string;
   branch_name: string;
+  phone_number?: string;
   is_active: boolean;
 }
 
@@ -91,6 +93,7 @@ export default function ControlPanel({ user }: { user: User }) {
   const [branchForm, setBranchForm] = useState({
     name: '',
     address: '',
+    phone: '',
     is_active: true
   });
   const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
@@ -121,6 +124,7 @@ export default function ControlPanel({ user }: { user: User }) {
   const [savedProducts, setSavedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingTickerId, setEditingTickerId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -142,39 +146,73 @@ export default function ControlPanel({ user }: { user: User }) {
 
   async function saveNotice() {
     if (!noticeForm.content) return;
-    const { error } = await supabase
-      .from('branch_ticker')
-      .insert([{ 
-        type: 'notice',
-        top_message: noticeForm.content,
-        branch_name: '',
-        bottom_message: '',
-        is_active: noticeForm.is_active,
-        user_id: user.id 
-      }]);
     
-    if (!error) {
-      setNoticeForm({ content: '', is_active: true });
-      fetchBranches();
+    if (editingTickerId) {
+      await supabase.from('branch_ticker').update({
+        top_message: noticeForm.content,
+        is_active: noticeForm.is_active
+      }).eq('id', editingTickerId);
+      setEditingTickerId(null);
+    } else {
+      await supabase
+        .from('branch_ticker')
+        .insert([{ 
+          type: 'notice',
+          top_message: noticeForm.content,
+          branch_name: '',
+          bottom_message: '',
+          is_active: noticeForm.is_active,
+          user_id: user.id 
+        }]);
     }
+    
+    setNoticeForm({ content: '', is_active: true });
+    fetchBranches();
   }
 
   async function saveBranchAddress() {
     if (!branchForm.name || !branchForm.address) return;
-    const { error } = await supabase
-      .from('branch_ticker')
-      .insert([{ 
-        type: 'branch',
+    
+    if (editingTickerId) {
+      await supabase.from('branch_ticker').update({
         branch_name: branchForm.name,
         bottom_message: branchForm.address,
-        top_message: '',
-        is_active: branchForm.is_active,
-        user_id: user.id 
-      }]);
+        phone_number: branchForm.phone,
+        is_active: branchForm.is_active
+      }).eq('id', editingTickerId);
+      setEditingTickerId(null);
+    } else {
+      await supabase
+        .from('branch_ticker')
+        .insert([{ 
+          type: 'branch',
+          branch_name: branchForm.name,
+          bottom_message: branchForm.address,
+          phone_number: branchForm.phone,
+          top_message: '',
+          is_active: branchForm.is_active,
+          user_id: user.id 
+        }]);
+    }
     
-    if (!error) {
-      setBranchForm({ name: '', address: '', is_active: true });
-      fetchBranches();
+    setBranchForm({ name: '', address: '', phone: '', is_active: true });
+    fetchBranches();
+  }
+
+  function editTickerItem(item: TickerItem) {
+    setEditingTickerId(item.id!);
+    if (item.type === 'notice') {
+      setNoticeForm({
+        content: item.top_message,
+        is_active: item.is_active
+      });
+    } else {
+      setBranchForm({
+        name: item.branch_name,
+        address: item.bottom_message,
+        phone: item.phone_number || '',
+        is_active: item.is_active
+      });
     }
   }
 
@@ -841,144 +879,245 @@ export default function ControlPanel({ user }: { user: User }) {
             </div>
           </div>
         ) : activeTab === 'branch-address' ? (
-          <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
+          <div className="p-8 lg:p-12 max-w-[1600px] mx-auto flex flex-col gap-12">
             <div>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ticker Segments</h2>
               <p className="text-slate-500 mt-2">Independently manage Notice and Branch address segments for your live ticker.</p>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
-              <div className="space-y-12">
-                {/* NOTICE SEGMENT */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
-                  </div>
-                  
-                  <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-4">
-                    <FormInput 
-                      label="Notice Text" 
-                      placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
-                      value={noticeForm.content} 
-                      onChange={v => setNoticeForm({...noticeForm, content: v})} 
-                    />
-                    <button 
-                      onClick={saveNotice}
-                      className="w-full bg-[#00a651] text-white font-black uppercase tracking-widest py-3 rounded-xl hover:opacity-90 transition-all text-[10px]"
-                    >
-                      Add Notice
-                    </button>
-                    
-                    <div className="divide-y divide-slate-50 border-t border-slate-50 mt-4">
-                      {tickerItems.filter(i => i.type === 'notice').map(item => (
-                        <div key={item.id} className="py-3 flex items-center justify-between">
-                          <p className="text-xs font-medium text-slate-700 truncate max-w-[200px]">{item.top_message}</p>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => toggleBranchStatus(item.id!, item.is_active)}
-                              className={cn("p-1.5 rounded-lg border", item.is_active ? "bg-green-50 text-green-600 border-green-100" : "bg-slate-50 text-slate-400 border-slate-100")}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => deleteBranch(item.id!)} className="p-1.5 text-red-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            <div className="space-y-16">
+              {/* NOTICE SEGMENT */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
                 </div>
-
-                {/* BRANCH SEGMENT */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-[#004a99] rounded-full" />
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
+                
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6">
+                  <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="flex-1 w-full">
+                      <FormInput 
+                        label="Notice Text" 
+                        placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
+                        value={noticeForm.content} 
+                        onChange={v => setNoticeForm({...noticeForm, content: v})} 
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                      <button 
+                        onClick={saveNotice}
+                        className="flex-1 md:w-auto px-12 bg-[#00a651] text-white font-black uppercase tracking-widest py-4 rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                      >
+                        {editingTickerId ? 'Update Notice' : 'Add Notice'}
+                      </button>
+                      {editingTickerId && tickerItems.find(i => i.id === editingTickerId)?.type === 'notice' && (
+                        <button 
+                          onClick={() => {
+                            setEditingTickerId(null);
+                            setNoticeForm({ content: '', is_active: true });
+                          }}
+                          className="px-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
-                  <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormInput label="Branch Name" value={branchForm.name} onChange={v => setBranchForm({...branchForm, name: v})} />
-                      <FormInput label="Branch Address" value={branchForm.address} onChange={v => setBranchForm({...branchForm, address: v})} />
-                    </div>
-                    <button 
-                      onClick={saveBranchAddress}
-                      className="w-full bg-[#004a99] text-white font-black uppercase tracking-widest py-3 rounded-xl hover:opacity-90 transition-all text-[10px]"
-                    >
-                      Add Branch
-                    </button>
-
-                    <div className="divide-y divide-slate-50 border-t border-slate-50 mt-4">
-                      {tickerItems.filter(i => i.type === 'branch').map(item => (
-                        <div key={item.id} className="py-3 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-slate-800">{item.branch_name}</p>
-                            <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{item.bottom_message}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => toggleBranchStatus(item.id!, item.is_active)}
-                              className={cn("p-1.5 rounded-lg border", item.is_active ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-400 border-slate-100")}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => deleteBranch(item.id!)} className="p-1.5 text-red-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      ))}
+                  <div className="border-t border-slate-50 pt-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-separate border-spacing-0">
+                        <thead>
+                          <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                             <th className="pb-4 pt-2 font-bold">Notice Content</th>
+                             <th className="pb-4 pt-2 font-bold text-center">Status</th>
+                             <th className="pb-4 pt-2 font-bold text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {tickerItems.filter(i => i.type === 'notice').map(item => (
+                            <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
+                              <td className="py-4 font-medium text-xs text-slate-800">{item.top_message}</td>
+                              <td className="py-4 text-center">
+                                <button 
+                                  onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                                  className={cn("p-2 rounded-lg border transition-all", item.is_active ? "bg-green-50 text-green-600 border-green-100" : "bg-slate-50 text-slate-400 border-slate-100")}
+                                >
+                                  {item.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                </button>
+                              </td>
+                              <td className="py-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button 
+                                    onClick={() => editTickerItem(item)}
+                                    className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                   title="Edit">
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => deleteBranch(item.id!)} className="p-2 text-slate-300 hover:text-red-500 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Preview Area */}
-              <div className="space-y-6">
-                 <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Live Engine Preview</p>
-                 <div className="aspect-video bg-slate-900 rounded-3xl relative overflow-hidden shadow-2xl border border-white/5 flex flex-col justify-end p-0">
-                    <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none">
-                       {/* Top Line - Shows Active Notice */}
+              {/* Relocated Full-Width Preview & Source URL */}
+              <div className="w-full bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
+                <div className="flex flex-col md:flex-row items-center gap-12">
+                  <div className="w-full md:w-96 space-y-3">
+                    <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Overlay Source URL</p>
+                    <div className="flex items-center gap-3">
+                      <code className="flex-1 bg-white p-3 rounded-xl border border-slate-100 text-xs font-mono text-slate-600 truncate">{getAppUrl()}/branchaddress/{user.id}</code>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${getAppUrl()}/branchaddress/${user.id}`);
+                          alert("Link copied!");
+                        }}
+                        className="bg-white p-3 rounded-xl border border-slate-100 text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/5 p-1 min-h-[80px] flex items-center justify-center">
+                    <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none origin-center">
                        <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
                           <div className="w-[80px] bg-[#004a99] h-full flex items-center justify-center">
-                             <span className="text-white font-black text-[10px] italic">নোটিশ</span>
+                             <span className="text-white font-black text-xs italic">নোটিশ</span>
                           </div>
-                          <div className="flex-1 px-4 text-white text-[10px] font-bold truncate">
+                          <div className="flex-1 px-4 text-white text-xs font-bold truncate">
                              {tickerItems.find(i => i.type === 'notice' && i.is_active)?.top_message || noticeForm.content || '...'}
                           </div>
                        </div>
-                       {/* Bottom Line - Shows Active Branch */}
                        <div className="h-1/2 bg-[#004a99] flex items-center">
                           <div className="w-[80px] bg-[#00a651] h-full flex items-center justify-center text-center">
-                             <span className="text-white font-bold text-[8px] px-1 whitespace-nowrap overflow-hidden">
+                             <span className="text-white font-bold text-[10px] px-2 whitespace-nowrap overflow-hidden">
                                {tickerItems.find(i => i.type === 'branch' && i.is_active)?.branch_name || branchForm.name || 'BRANCH'}
                              </span>
                           </div>
-                          <div className="flex-1 px-4 text-white text-[8px] font-medium truncate">
+                          <div className="flex-1 px-4 text-white text-[10px] font-medium truncate">
                              {tickerItems.find(i => i.type === 'branch' && i.is_active)?.bottom_message || branchForm.address || 'Address Area'}
                           </div>
-                          <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
-                             <span className="text-slate-900 font-bold text-[10px]">
+                          <div className="w-[70px] bg-[#ffc107] h-full flex items-center justify-center">
+                             <span className="text-slate-900 font-bold text-xs">
                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                              </span>
                           </div>
                        </div>
                     </div>
-                 </div>
+                  </div>
+                </div>
+              </div>
 
-                 <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl">
-                    <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Overlay Source URL</p>
-                    <div className="flex items-center gap-3">
-                       <code className="flex-1 bg-white p-3 rounded-lg border border-slate-100 text-[10px] font-mono text-slate-600">{getAppUrl()}/branchaddress/{user.id}</code>
-                       <button 
-                         onClick={() => {
-                           navigator.clipboard.writeText(`${getAppUrl()}/branchaddress/${user.id}`);
-                           alert("Link copied!");
-                         }}
-                         className="bg-white p-3 rounded-lg border border-slate-100 text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
-                       >
-                         <Copy className="w-4 h-4" />
-                       </button>
+              {/* BRANCH SEGMENT */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-[#004a99] rounded-full" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
+                </div>
+                
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <FormInput label="Branch Name" value={branchForm.name} onChange={v => setBranchForm({...branchForm, name: v})} />
+                    <FormInput label="Phone Number" value={branchForm.phone} onChange={v => setBranchForm({...branchForm, phone: v})} />
+                    <FormInput label="Address" value={branchForm.address} onChange={v => setBranchForm({...branchForm, address: v})} />
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={saveBranchAddress}
+                        className="flex-1 bg-[#004a99] text-white font-black uppercase tracking-widest py-4 rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                      >
+                        {editingTickerId ? 'Update Branch' : 'Add Branch'}
+                      </button>
+                      {editingTickerId && tickerItems.find(i => i.id === editingTickerId)?.type === 'branch' && (
+                        <button 
+                          onClick={() => {
+                            setEditingTickerId(null);
+                            setBranchForm({ name: '', address: '', phone: '', is_active: true });
+                          }}
+                          className="px-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                 </div>
+                  </div>
+
+                  <div className="border-t border-slate-50 pt-8">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-separate border-spacing-0">
+                        <thead>
+                          <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                             <th className="pb-4 pt-2 font-bold w-1/4">Branch Name</th>
+                             <th className="pb-4 pt-2 font-bold w-1/6">Phone Number</th>
+                             <th className="pb-4 pt-2 font-bold">Address</th>
+                             <th className="pb-4 pt-2 font-bold text-center">Project Status</th>
+                             <th className="pb-4 pt-2 font-bold text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {tickerItems.filter(i => i.type === 'branch').map(item => (
+                            <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
+                              <td className="py-5 font-bold text-xs text-slate-900">{item.branch_name}</td>
+                              <td className="py-5 text-xs text-slate-500 font-medium">{item.phone_number || '---'}</td>
+                              <td className="py-5 text-xs text-slate-400 truncate max-w-sm">{item.bottom_message}</td>
+                              <td className="py-5 text-center">
+                                <div className="flex items-center justify-center gap-3">
+                                  <span className={cn(
+                                    "text-[10px] font-bold uppercase tracking-tighter w-12 text-right",
+                                    item.is_active ? "text-green-600" : "text-slate-400"
+                                  )}>
+                                    {item.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                  <button 
+                                    onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                                    className={cn(
+                                      "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                      item.is_active ? "bg-[#00a651]" : "bg-slate-200"
+                                    )}
+                                  >
+                                    <span
+                                      className={cn(
+                                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                        item.is_active ? "translate-x-5" : "translate-x-0"
+                                      )}
+                                    />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="py-5 text-right text-actions-cell">
+                                <div className="flex justify-end gap-2">
+                                  <button 
+                                    onClick={() => editTickerItem(item)}
+                                    className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => deleteBranch(item.id!)}
+                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {tickerItems.filter(i => i.type === 'branch').length === 0 && (
+                        <div className="py-16 text-center text-slate-300 italic text-xs">No branches configured</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
