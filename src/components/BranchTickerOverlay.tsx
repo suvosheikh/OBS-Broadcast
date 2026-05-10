@@ -85,21 +85,21 @@ export default function BranchTickerOverlay() {
   }
 
   return (
-    <div className="w-[1920px] h-[180px] bg-transparent font-sans overflow-hidden relative flex flex-col">
+    <div className="w-full h-screen bg-transparent font-sans overflow-hidden relative flex flex-col justify-end">
       {/* Ticker Container */}
-      <div className="w-full flex flex-col shadow-2xl h-full">
+      <div className="w-full flex flex-col shadow-2xl">
         
         {/* Top Ticker Line (Green) - Notice */}
         <AnimatePresence mode="wait">
           {currentNotice && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 90, opacity: 1 }}
+              animate={{ height: 'max(90px, 8vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="bg-[#00a651] flex items-center overflow-hidden border-b border-white/10"
             >
-              <div className="w-60 bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20">
-                 <span className="text-white font-black text-4xl tracking-tighter italic">নোটিশ</span>
+              <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20">
+                 <span className="text-white font-black text-[max(2.5vw,24px)] tracking-tighter italic">নোটিশ</span>
               </div>
               <div className="flex-1 px-10 overflow-hidden relative h-full flex items-center">
                  <AnimatePresence mode="wait">
@@ -109,7 +109,7 @@ export default function BranchTickerOverlay() {
                       animate={{ x: 0 }}
                       exit={{ x: '-100%' }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="whitespace-nowrap text-white font-black text-5xl tracking-tight"
+                      className="whitespace-nowrap text-white font-black text-[max(3vw,32px)] tracking-tight"
                     >
                       {currentNotice.top_message}
                     </motion.div>
@@ -124,12 +124,12 @@ export default function BranchTickerOverlay() {
           {currentBranch && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 90, opacity: 1 }}
+              animate={{ height: 'max(90px, 8vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="bg-[#004a99] flex items-center overflow-hidden"
             >
-              <div className="w-60 bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20">
-                 <span className="text-white font-bold text-2xl tracking-tight text-center px-2 break-words leading-tight">
+              <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20">
+                 <span className="text-white font-bold text-[max(1.2vw,14px)] tracking-tight text-center px-4 break-words leading-tight">
                     {currentBranch.branch_name}
                  </span>
               </div>
@@ -142,7 +142,7 @@ export default function BranchTickerOverlay() {
                       animate={{ x: 0 }}
                       exit={{ x: '-100%' }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="whitespace-nowrap text-white font-medium text-4xl tracking-tight"
+                      className="whitespace-nowrap text-white font-medium text-[max(2.2vw,24px)] tracking-tight"
                     >
                       {currentBranch.bottom_message}
                     </motion.div>
@@ -150,8 +150,8 @@ export default function BranchTickerOverlay() {
               </div>
 
               {/* Clock Section */}
-              <div className="w-48 bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20">
-                <span className="text-slate-900 font-black text-4xl">
+              <div className="w-[10%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20">
+                <span className="text-slate-900 font-black text-[max(2.2vw,24px)]">
                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                 </span>
               </div>
