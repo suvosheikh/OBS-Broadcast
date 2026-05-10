@@ -13,6 +13,23 @@ interface TickerItem {
   sort_order?: number;
 }
 
+const TypewritingText = ({ text, speed = 30 }: { text: string; speed?: number }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    let i = 0;
+    setDisplayedText('');
+    const interval = setInterval(() => {
+      setDisplayedText(text.slice(0, i + 1));
+      i++;
+      if (i >= text.length) clearInterval(interval);
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+
+  return <>{displayedText}</>;
+};
+
 export default function BranchTickerOverlay() {
   const { userId } = useParams<{ userId: string }>();
   const [notices, setNotices] = useState<TickerItem[]>([]);
@@ -155,18 +172,22 @@ export default function BranchTickerOverlay() {
                  <AnimatePresence mode="wait">
                     <motion.div
                       key={`branch-${currentBranch.id}`}
-                      initial={{ x: '100%' }}
-                      animate={{ x: 0 }}
-                      exit={{ x: '-100%' }}
+                      initial={{ opacity: 1, x: 0 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ x: '-100%', opacity: 0 }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
                       className="flex items-center gap-6 whitespace-nowrap text-white"
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-[max(2.2vw,24px)] tracking-tight font-bangla">
-                          {(() => {
-                            const combined = `${currentBranch.bottom_message}${currentBranch.phone_number ? ` - ${currentBranch.phone_number}` : ''}`;
-                            return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
-                          })()}
+                          <TypewritingText 
+                            text={(() => {
+                              const addr = currentBranch.bottom_message;
+                              const phone = currentBranch.phone_number;
+                              const combined = `${addr}${phone ? ` - ${phone}` : ''}`;
+                              return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
+                            })()} 
+                          />
                         </span>
                       </div>
                     </motion.div>
