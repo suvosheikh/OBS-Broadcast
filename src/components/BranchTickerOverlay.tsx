@@ -3,13 +3,37 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { MapPin, Phone } from 'lucide-react';
+
 interface TickerItem {
   id: string;
-  type: 'notice' | 'branch';
+  type: 'notice' | 'branch' | 'branch_address' | string;
   top_message: string;
   bottom_message: string;
   branch_name: string;
+  phone_number?: string;
+  sort_order?: number;
 }
+
+const Typewriter = ({ text, speed = 30, delay = 800 }: { text: string; speed?: number; delay?: number }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    setDisplayedText('');
+    const timer = setTimeout(() => {
+      let i = 0;
+      const interval = setInterval(() => {
+        setDisplayedText(text.slice(0, i + 1));
+        i++;
+        if (i >= text.length) clearInterval(interval);
+      }, speed);
+      return () => clearInterval(interval);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [text, speed, delay]);
+
+  return <>{displayedText}</>;
+};
 
 export default function BranchTickerOverlay() {
   const { userId } = useParams<{ userId: string }>();
@@ -25,16 +49,22 @@ export default function BranchTickerOverlay() {
         .from('branch_ticker')
         .select('*')
         .eq('is_active', true)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       
       if (userId) {
         query = query.eq('user_id', userId);
       }
 
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) {
+        console.error("Error fetching branch ticker items:", error);
+        return;
+      }
       const allItems = (data || []) as TickerItem[];
+      console.log("Fetched items:", allItems);
       setNotices(allItems.filter(i => i.type === 'notice'));
-      setBranches(allItems.filter(i => i.type === 'branch' || !i.type));
+      setBranches(allItems.filter(i => i.type === 'branch' || i.type === 'branch_address' || !i.type));
     }
 
     fetchItems();
@@ -99,7 +129,7 @@ export default function BranchTickerOverlay() {
               className="bg-[#00a651] flex items-center overflow-hidden border-b border-white/10"
             >
               <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20">
-                 <span className="text-white font-black text-[max(2.5vw,24px)] tracking-tighter italic">নোটিশ</span>
+                 <span className="text-white font-black text-[max(2.5vw,24px)] tracking-tighter italic font-bangla">নোটিশ</span>
               </div>
               <div className="flex-1 px-10 overflow-hidden relative h-full flex items-center">
                  <AnimatePresence mode="wait">
@@ -109,7 +139,7 @@ export default function BranchTickerOverlay() {
                       animate={{ x: 0 }}
                       exit={{ x: '-100%' }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="whitespace-nowrap text-white font-black text-[max(3vw,32px)] tracking-tight"
+                      className="whitespace-nowrap text-white font-black text-[max(3vw,32px)] tracking-tight font-bangla"
                     >
                       {currentNotice.top_message}
                     </motion.div>
@@ -128,10 +158,19 @@ export default function BranchTickerOverlay() {
               exit={{ height: 0, opacity: 0 }}
               className="bg-[#004a99] flex items-center overflow-hidden"
             >
-              <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20">
-                 <span className="text-white font-bold text-[max(1.2vw,14px)] tracking-tight text-center px-4 break-words leading-tight">
-                    {currentBranch.branch_name}
-                 </span>
+              <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20 relative overflow-hidden">
+                 <AnimatePresence mode="wait">
+                   <motion.span 
+                     key={`branch-name-${currentBranch.id}`}
+                     initial={{ y: '100%' }}
+                     animate={{ y: 0 }}
+                     exit={{ y: '-100%' }}
+                     transition={{ duration: 0.5, ease: "easeOut" }}
+                     className="absolute text-white font-bold text-[max(1.2vw,14px)] tracking-tight text-center px-4 break-words leading-tight font-bangla"
+                   >
+                      {currentBranch.branch_name}
+                   </motion.span>
+                 </AnimatePresence>
               </div>
               
               <div className="flex-1 px-10 overflow-hidden relative h-full flex items-center">
@@ -142,9 +181,23 @@ export default function BranchTickerOverlay() {
                       animate={{ x: 0 }}
                       exit={{ x: '-100%' }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="whitespace-nowrap text-white font-medium text-[max(2.2vw,24px)] tracking-tight"
+                      className="flex items-center gap-10 whitespace-nowrap text-white"
                     >
-                      {currentBranch.bottom_message}
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-[1.2em] h-[1.2em] text-[#00a651]" />
+                        <span className="font-medium text-[max(2.2vw,24px)] tracking-tight font-bangla min-w-[20px]">
+                          <Typewriter text={currentBranch.bottom_message} speed={30} delay={800} />
+                        </span>
+                      </div>
+                      
+                      {currentBranch.phone_number && (
+                        <div className="flex items-center gap-3 border-l border-white/20 pl-10">
+                          <Phone className="w-[1em] h-[1em] text-[#00a651] fill-[#00a651]" />
+                          <span className="font-black text-[max(2vw,20px)] tracking-tight font-bangla min-w-[20px]">
+                            <Typewriter text={currentBranch.phone_number} speed={30} delay={1500} />
+                          </span>
+                        </div>
+                      )}
                     </motion.div>
                  </AnimatePresence>
               </div>
@@ -152,7 +205,7 @@ export default function BranchTickerOverlay() {
               {/* Clock Section with Scrolling Animation */}
               <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-8 overflow-hidden min-w-[14%]">
                 <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,18px)] tracking-tighter whitespace-nowrap">
-                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split('').map((char, i) => (
+                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).split('').map((char, i) => (
                      <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.75em] flex justify-center overflow-hidden">
                         <AnimatePresence mode="popLayout">
                            <motion.span

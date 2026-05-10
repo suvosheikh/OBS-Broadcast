@@ -27,6 +27,7 @@ import {
   Trophy,
   Image as ImageIcon,
   MapPin,
+  Phone,
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
 
@@ -66,11 +67,12 @@ interface WinnerData {
 
 interface TickerItem {
   id?: string;
-  type: 'notice' | 'branch';
+  type: 'notice' | 'branch' | 'branch_address' | string;
   top_message: string;
   bottom_message: string;
   branch_name: string;
   phone_number?: string;
+  sort_order?: number;
   is_active: boolean;
 }
 
@@ -94,6 +96,7 @@ export default function ControlPanel({ user }: { user: User }) {
     name: '',
     address: '',
     phone: '',
+    sort_order: 0,
     is_active: true
   });
   const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
@@ -125,6 +128,30 @@ export default function ControlPanel({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editingTickerId, setEditingTickerId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<'ticker' | 'winner' | 'product' | null>(null);
+
+  const [currentBranchIndex, setCurrentBranchIndex] = useState(0);
+  const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
+
+  useEffect(() => {
+    const activeNotices = tickerItems.filter(i => i.type === 'notice' && i.is_active);
+    const activeBranches = tickerItems.filter(i => i.type === 'branch' && i.is_active);
+
+    const timer = setInterval(() => {
+      if (activeNotices.length > 0) {
+        setCurrentNoticeIndex(prev => (prev + 1) % activeNotices.length);
+      }
+      if (activeBranches.length > 0) {
+        setCurrentBranchIndex(prev => (prev + 1) % activeBranches.length);
+      }
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, [tickerItems]);
+
+  const previewNotice = tickerItems.filter(i => i.type === 'notice' && i.is_active)[currentNoticeIndex];
+  const previewBranch = tickerItems.filter(i => i.type === 'branch' && i.is_active)[currentBranchIndex];
 
   useEffect(() => {
     fetchStats();
@@ -136,25 +163,32 @@ export default function ControlPanel({ user }: { user: User }) {
   }, [user.id]);
 
   async function fetchBranches() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('branch_ticker')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setTickerItems(data || []);
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error("Error fetching branch ticker:", error);
+    } else {
+      setTickerItems(data || []);
+    }
   }
 
   async function saveNotice() {
     if (!noticeForm.content) return;
     
+    let result;
     if (editingTickerId) {
-      await supabase.from('branch_ticker').update({
+      result = await supabase.from('branch_ticker').update({
         top_message: noticeForm.content,
         is_active: noticeForm.is_active
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
-      await supabase
+      result = await supabase
         .from('branch_ticker')
         .insert([{ 
           type: 'notice',
@@ -165,38 +199,49 @@ export default function ControlPanel({ user }: { user: User }) {
           user_id: user.id 
         }]);
     }
-    
-    setNoticeForm({ content: '', is_active: true });
-    fetchBranches();
+
+    if (result?.error) {
+      alert(`SQL Error: ${result.error.message}`);
+    } else {
+      setNoticeForm({ content: '', is_active: true });
+      fetchBranches();
+    }
   }
 
   async function saveBranchAddress() {
     if (!branchForm.name || !branchForm.address) return;
     
+    let result;
     if (editingTickerId) {
-      await supabase.from('branch_ticker').update({
+      result = await supabase.from('branch_ticker').update({
         branch_name: branchForm.name,
         bottom_message: branchForm.address,
         phone_number: branchForm.phone,
+        sort_order: branchForm.sort_order,
         is_active: branchForm.is_active
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
-      await supabase
+      result = await supabase
         .from('branch_ticker')
         .insert([{ 
           type: 'branch',
           branch_name: branchForm.name,
           bottom_message: branchForm.address,
           phone_number: branchForm.phone,
+          sort_order: branchForm.sort_order,
           top_message: '',
           is_active: branchForm.is_active,
           user_id: user.id 
         }]);
     }
     
-    setBranchForm({ name: '', address: '', phone: '', is_active: true });
-    fetchBranches();
+    if (result?.error) {
+      alert(`SQL Error: ${result.error.message}`);
+    } else {
+      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true });
+      fetchBranches();
+    }
   }
 
   function editTickerItem(item: TickerItem) {
@@ -211,15 +256,41 @@ export default function ControlPanel({ user }: { user: User }) {
         name: item.branch_name,
         address: item.bottom_message,
         phone: item.phone_number || '',
+        sort_order: item.sort_order || 0,
         is_active: item.is_active
       });
     }
   }
 
   async function deleteBranch(id: string) {
-    if (!confirm('Are you sure?')) return;
-    await supabase.from('branch_ticker').delete().eq('id', id);
-    fetchBranches();
+    setDeleteConfirmId(id);
+    setDeleteTarget('ticker');
+  }
+
+  async function executeDelete() {
+    if (!deleteConfirmId || !deleteTarget) return;
+
+    let error;
+    if (deleteTarget === 'ticker') {
+      const result = await supabase.from('branch_ticker').delete().eq('id', deleteConfirmId);
+      error = result.error;
+      if (!error) fetchBranches();
+    } else if (deleteTarget === 'winner') {
+      const result = await supabase.from('winners').delete().eq('id', deleteConfirmId);
+      error = result.error;
+      if (!error) fetchWinners();
+    } else if (deleteTarget === 'product') {
+      const result = await supabase.from('products').delete().eq('id', deleteConfirmId);
+      error = result.error;
+      if (!error) fetchProducts();
+    }
+
+    if (error) {
+      alert(`Error deleting item: ${error.message}`);
+    }
+
+    setDeleteConfirmId(null);
+    setDeleteTarget(null);
   }
 
   async function toggleBranchStatus(id: string, current: boolean) {
@@ -272,9 +343,8 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function deleteWinner(id: string) {
-    if (!confirm('Are you sure?')) return;
-    await supabase.from('winners').delete().eq('id', id);
-    fetchWinners();
+    setDeleteConfirmId(id);
+    setDeleteTarget('winner');
   }
 
   async function toggleWinnerVisibility(id: string, current: boolean) {
@@ -395,10 +465,8 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function deleteProduct(id: string) {
-    if (!confirm('Are you sure?')) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) alert(error.message);
-    fetchProducts();
+    setDeleteConfirmId(id);
+    setDeleteTarget('product');
   }
 
   function editProduct(item: Product) {
@@ -966,7 +1034,6 @@ export default function ControlPanel({ user }: { user: User }) {
                 </div>
               </div>
 
-              {/* Relocated Full-Width Preview & Source URL */}
               <div className="w-full bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
                 <div className="flex flex-col md:flex-row items-center gap-12">
                   <div className="w-full md:w-96 space-y-3">
@@ -989,20 +1056,33 @@ export default function ControlPanel({ user }: { user: User }) {
                     <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none origin-center">
                        <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
                           <div className="w-[80px] bg-[#004a99] h-full flex items-center justify-center">
-                             <span className="text-white font-black text-xs italic">নোটিশ</span>
+                             <span className="text-white font-black text-xs italic font-bangla">নোটিশ</span>
                           </div>
-                          <div className="flex-1 px-4 text-white text-xs font-bold truncate">
-                             {tickerItems.find(i => i.type === 'notice' && i.is_active)?.top_message || noticeForm.content || '...'}
+                          <div className="flex-1 px-4 text-white text-xs font-bold truncate font-bangla">
+                             {previewNotice?.top_message || noticeForm.content || '...'}
                           </div>
                        </div>
                        <div className="h-1/2 bg-[#004a99] flex items-center">
                           <div className="w-[80px] bg-[#00a651] h-full flex items-center justify-center text-center">
-                             <span className="text-white font-bold text-[10px] px-2 whitespace-nowrap overflow-hidden">
-                               {tickerItems.find(i => i.type === 'branch' && i.is_active)?.branch_name || branchForm.name || 'BRANCH'}
+                             <span className="text-white font-bold text-[10px] px-2 whitespace-nowrap overflow-hidden font-bangla">
+                               {previewBranch?.branch_name || branchForm.name || 'BRANCH'}
                              </span>
                           </div>
-                          <div className="flex-1 px-4 text-white text-[10px] font-medium truncate">
-                             {tickerItems.find(i => i.type === 'branch' && i.is_active)?.bottom_message || branchForm.address || 'Address Area'}
+                          <div className="flex-1 px-4 text-white flex items-center gap-4 overflow-hidden">
+                             <div className="flex items-center gap-1 shrink-0">
+                                <MapPin className="w-3 h-3 text-[#00a651]" />
+                                <span className="text-[10px] font-medium truncate font-bangla">
+                                   {previewBranch?.bottom_message || branchForm.address || 'Address Area'}
+                                </span>
+                             </div>
+                             {(previewBranch?.phone_number || branchForm.phone) && (
+                                <div className="flex items-center gap-1 border-l border-white/20 pl-4 shrink-0">
+                                   <Phone className="w-2.5 h-2.5 text-[#00a651] fill-[#00a651]" />
+                                   <span className="text-[10px] font-black font-bangla">
+                                      {previewBranch?.phone_number || branchForm.phone}
+                                   </span>
+                                </div>
+                             )}
                           </div>
                           <div className="w-[70px] bg-[#ffc107] h-full flex items-center justify-center">
                              <span className="text-slate-900 font-bold text-xs">
@@ -1023,10 +1103,11 @@ export default function ControlPanel({ user }: { user: User }) {
                 </div>
                 
                 <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <FormInput label="Branch Name" value={branchForm.name} onChange={v => setBranchForm({...branchForm, name: v})} />
                     <FormInput label="Phone Number" value={branchForm.phone} onChange={v => setBranchForm({...branchForm, phone: v})} />
                     <FormInput label="Address" value={branchForm.address} onChange={v => setBranchForm({...branchForm, address: v})} />
+                    <FormInput label="Order" type="number" value={branchForm.sort_order.toString()} onChange={v => setBranchForm({...branchForm, sort_order: parseInt(v) || 0})} />
                     <div className="flex gap-2">
                       <button 
                         onClick={saveBranchAddress}
@@ -1038,7 +1119,7 @@ export default function ControlPanel({ user }: { user: User }) {
                         <button 
                           onClick={() => {
                             setEditingTickerId(null);
-                            setBranchForm({ name: '', address: '', phone: '', is_active: true });
+                            setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true });
                           }}
                           className="px-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"
                         >
@@ -1053,19 +1134,31 @@ export default function ControlPanel({ user }: { user: User }) {
                       <table className="w-full text-left border-separate border-spacing-0">
                         <thead>
                           <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                             <th className="pb-4 pt-2 font-bold text-center">Order</th>
                              <th className="pb-4 pt-2 font-bold w-1/4">Branch Name</th>
                              <th className="pb-4 pt-2 font-bold w-1/6">Phone Number</th>
                              <th className="pb-4 pt-2 font-bold">Address</th>
-                             <th className="pb-4 pt-2 font-bold text-center">Project Status</th>
+                             <th className="pb-4 pt-2 font-bold text-center">Status</th>
                              <th className="pb-4 pt-2 font-bold text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {tickerItems.filter(i => i.type === 'branch').map(item => (
                             <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
-                              <td className="py-5 font-bold text-xs text-slate-900">{item.branch_name}</td>
-                              <td className="py-5 text-xs text-slate-500 font-medium">{item.phone_number || '---'}</td>
-                              <td className="py-5 text-xs text-slate-400 truncate max-w-sm">{item.bottom_message}</td>
+                              <td className="py-5 text-center font-mono text-[10px] bg-slate-50/30 rounded-lg">{item.sort_order || 0}</td>
+                              <td className="py-5 pl-4 font-bold text-xs text-slate-900">{item.branch_name}</td>
+                              <td className="py-5 text-xs text-slate-500 font-medium">
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-3.5 h-3.5 text-slate-300" />
+                                  {item.phone_number || '---'}
+                                </div>
+                              </td>
+                              <td className="py-5 text-xs text-slate-400 truncate max-w-sm">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-slate-300" />
+                                  {item.bottom_message}
+                                </div>
+                              </td>
                               <td className="py-5 text-center">
                                 <div className="flex items-center justify-center gap-3">
                                   <span className={cn(
@@ -1354,16 +1447,64 @@ export default function ControlPanel({ user }: { user: User }) {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Wizard */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-slate-100 overflow-hidden relative"
+            >
+              {/* Decoration */}
+              <div className="absolute top-0 left-0 right-0 h-2 bg-red-500" />
+              
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center shadow-inner">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Confirm Deletion</h3>
+                  <p className="text-sm font-medium text-slate-500 leading-relaxed px-4">
+                    Are you sure you want to permanently remove this item from the station? This action cannot be undone.
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  <button 
+                    onClick={() => {
+                      setDeleteConfirmId(null);
+                      setDeleteTarget(null);
+                    }}
+                    className="py-4 bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all border border-slate-200"
+                  >
+                    No, Keep it
+                  </button>
+                  <button 
+                    onClick={executeDelete}
+                    className="py-4 bg-red-500 text-white font-bold text-xs uppercase tracking-widest rounded-2xl hover:bg-red-600 transition-all shadow-lg shadow-red-100"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function FormInput({ label, value, onChange, placeholder }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string }) {
+function FormInput({ label, value, onChange, placeholder, type = 'text' }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string, type?: string }) {
   return (
     <div className="space-y-2">
       <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</label>
       <input
-        type="text"
+        type={type}
         value={value}
         placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
