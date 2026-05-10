@@ -149,11 +149,29 @@ export default function BranchTickerOverlay() {
                  </AnimatePresence>
               </div>
 
-              {/* Clock Section */}
-              <div className="w-[15%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4">
-                <span className="text-slate-900 font-black text-[max(1.8vw,20px)] whitespace-nowrap">
-                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
-                </span>
+              {/* Clock Section with Scrolling Animation */}
+              <div className="w-[18%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4 overflow-hidden">
+                <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,18px)] tracking-tighter whitespace-nowrap">
+                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split('').map((char, i) => (
+                     <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.65em] flex justify-center overflow-hidden">
+                        <AnimatePresence mode="popLayout">
+                           <motion.span
+                             key={`${char}-${i}`}
+                             initial={{ y: '100%' }}
+                             animate={{ y: 0 }}
+                             exit={{ y: '-100%' }}
+                             transition={{ 
+                               duration: 0.4, 
+                               ease: [0.23, 1, 0.32, 1] 
+                             }}
+                             className="absolute"
+                           >
+                             {char}
+                           </motion.span>
+                        </AnimatePresence>
+                     </div>
+                   ))}
+                </div>
               </div>
             </motion.div>
           )}
