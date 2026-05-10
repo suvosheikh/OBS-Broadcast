@@ -3,8 +3,6 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { MapPin, Phone } from 'lucide-react';
-
 interface TickerItem {
   id: string;
   type: 'notice' | 'branch' | 'branch_address' | string;
@@ -14,26 +12,6 @@ interface TickerItem {
   phone_number?: string;
   sort_order?: number;
 }
-
-const Typewriter = ({ text, speed = 30, delay = 800 }: { text: string; speed?: number; delay?: number }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  
-  useEffect(() => {
-    setDisplayedText('');
-    const timer = setTimeout(() => {
-      let i = 0;
-      const interval = setInterval(() => {
-        setDisplayedText(text.slice(0, i + 1));
-        i++;
-        if (i >= text.length) clearInterval(interval);
-      }, speed);
-      return () => clearInterval(interval);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [text, speed, delay]);
-
-  return <>{displayedText}</>;
-};
 
 export default function BranchTickerOverlay() {
   const { userId } = useParams<{ userId: string }>();
@@ -181,30 +159,23 @@ export default function BranchTickerOverlay() {
                       animate={{ x: 0 }}
                       exit={{ x: '-100%' }}
                       transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="flex items-center gap-10 whitespace-nowrap text-white"
+                      className="flex items-center gap-6 whitespace-nowrap text-white"
                     >
                       <div className="flex items-center gap-3">
-                        <MapPin className="w-[1.2em] h-[1.2em] text-[#00a651]" />
-                        <span className="font-medium text-[max(2.2vw,24px)] tracking-tight font-bangla min-w-[20px]">
-                          <Typewriter text={currentBranch.bottom_message} speed={30} delay={800} />
+                        <span className="font-medium text-[max(2.2vw,24px)] tracking-tight font-bangla">
+                          {(() => {
+                            const combined = `${currentBranch.bottom_message}${currentBranch.phone_number ? ` - ${currentBranch.phone_number}` : ''}`;
+                            return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
+                          })()}
                         </span>
                       </div>
-                      
-                      {currentBranch.phone_number && (
-                        <div className="flex items-center gap-3 border-l border-white/20 pl-10">
-                          <Phone className="w-[1em] h-[1em] text-[#00a651] fill-[#00a651]" />
-                          <span className="font-black text-[max(2vw,20px)] tracking-tight font-bangla min-w-[20px]">
-                            <Typewriter text={currentBranch.phone_number} speed={30} delay={1500} />
-                          </span>
-                        </div>
-                      )}
                     </motion.div>
                  </AnimatePresence>
               </div>
 
               {/* Clock Section with Scrolling Animation */}
-              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-8 overflow-hidden min-w-[14%]">
-                <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,18px)] tracking-tighter whitespace-nowrap">
+              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4 overflow-hidden min-w-[12%]">
+                <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,16px)] tracking-tighter whitespace-nowrap">
                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).split('').map((char, i) => (
                      <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.75em] flex justify-center overflow-hidden">
                         <AnimatePresence mode="popLayout">

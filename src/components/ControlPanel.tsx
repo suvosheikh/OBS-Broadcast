@@ -1068,24 +1068,18 @@ export default function ControlPanel({ user }: { user: User }) {
                                {previewBranch?.branch_name || branchForm.name || 'BRANCH'}
                              </span>
                           </div>
-                          <div className="flex-1 px-4 text-white flex items-center gap-4 overflow-hidden">
-                             <div className="flex items-center gap-1 shrink-0">
-                                <MapPin className="w-3 h-3 text-[#00a651]" />
-                                <span className="text-[10px] font-medium truncate font-bangla">
-                                   {previewBranch?.bottom_message || branchForm.address || 'Address Area'}
-                                </span>
-                             </div>
-                             {(previewBranch?.phone_number || branchForm.phone) && (
-                                <div className="flex items-center gap-1 border-l border-white/20 pl-4 shrink-0">
-                                   <Phone className="w-2.5 h-2.5 text-[#00a651] fill-[#00a651]" />
-                                   <span className="text-[10px] font-black font-bangla">
-                                      {previewBranch?.phone_number || branchForm.phone}
-                                   </span>
-                                </div>
-                             )}
+                          <div className="flex-1 px-4 text-white flex items-center overflow-hidden">
+                             <span className="text-[10px] font-medium truncate font-bangla">
+                                {(() => {
+                                   const addr = previewBranch?.bottom_message || branchForm.address || 'Address Area';
+                                   const phone = previewBranch?.phone_number || branchForm.phone;
+                                   const combined = `${addr}${phone ? ` - ${phone}` : ''}`;
+                                   return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
+                                })()}
+                             </span>
                           </div>
-                          <div className="w-[70px] bg-[#ffc107] h-full flex items-center justify-center">
-                             <span className="text-slate-900 font-bold text-xs">
+                          <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
+                             <span className="text-slate-900 font-bold text-[10px]">
                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                              </span>
                           </div>
@@ -1148,16 +1142,10 @@ export default function ControlPanel({ user }: { user: User }) {
                               <td className="py-5 text-center font-mono text-[10px] bg-slate-50/30 rounded-lg">{item.sort_order || 0}</td>
                               <td className="py-5 pl-4 font-bold text-xs text-slate-900">{item.branch_name}</td>
                               <td className="py-5 text-xs text-slate-500 font-medium">
-                                <div className="flex items-center gap-2">
-                                  <Phone className="w-3.5 h-3.5 text-slate-300" />
-                                  {item.phone_number || '---'}
-                                </div>
+                                {item.phone_number || '---'}
                               </td>
                               <td className="py-5 text-xs text-slate-400 truncate max-w-sm">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="w-3.5 h-3.5 text-slate-300" />
-                                  {item.bottom_message}
-                                </div>
+                                {item.bottom_message}
                               </td>
                               <td className="py-5 text-center">
                                 <div className="flex items-center justify-center gap-3">
