@@ -150,9 +150,9 @@ export default function BranchTickerOverlay() {
               </div>
 
               {/* Clock Section */}
-              <div className="w-[10%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20">
-                <span className="text-slate-900 font-black text-[max(2.2vw,24px)]">
-                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+              <div className="w-[15%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4">
+                <span className="text-slate-900 font-black text-[max(1.8vw,20px)] whitespace-nowrap">
+                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </span>
               </div>
             </motion.div>
