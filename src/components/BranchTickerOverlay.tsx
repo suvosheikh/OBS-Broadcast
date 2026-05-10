@@ -150,10 +150,10 @@ export default function BranchTickerOverlay() {
               </div>
 
               {/* Clock Section with Scrolling Animation */}
-              <div className="w-[18%] bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4 overflow-hidden">
+              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-8 overflow-hidden min-w-[14%]">
                 <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,18px)] tracking-tighter whitespace-nowrap">
                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).split('').map((char, i) => (
-                     <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.65em] flex justify-center overflow-hidden">
+                     <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.75em] flex justify-center overflow-hidden">
                         <AnimatePresence mode="popLayout">
                            <motion.span
                              key={`${char}-${i}`}
