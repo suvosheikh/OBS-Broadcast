@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import { Square } from 'lucide-react';
 
 interface TickerItem {
   id: string;
@@ -11,23 +12,86 @@ interface TickerItem {
   branch_name: string;
   phone_number?: string;
   sort_order?: number;
+  display_duration?: number;
 }
 
-const TypewritingText = ({ text, speed = 30 }: { text: string; speed?: number }) => {
+const TypewritingText = ({ text, speed = 30, delay = 0, onComplete }: { text: string; speed?: number; delay?: number; onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = useState('');
   
   useEffect(() => {
-    let i = 0;
+    let timeout: any;
+    let interval: any;
+    
     setDisplayedText('');
-    const interval = setInterval(() => {
-      setDisplayedText(text.slice(0, i + 1));
-      i++;
-      if (i >= text.length) clearInterval(interval);
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed]);
+    timeout = setTimeout(() => {
+      let i = 0;
+      interval = setInterval(() => {
+        setDisplayedText(text.slice(0, i + 1));
+        i++;
+        if (i >= text.length) {
+          clearInterval(interval);
+          if (onComplete) onComplete();
+        }
+      }, speed);
+    }, delay);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [text, speed, delay, onComplete]);
 
   return <>{displayedText}</>;
+};
+
+const Marquee = ({ children, isVisible, textLength, branchId }: { children: React.ReactNode; isVisible: boolean; textLength: number; branchId: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [shouldScroll, setShouldScroll] = useState(false);
+  const [scrollWidth, setScrollWidth] = useState(0);
+
+  useEffect(() => {
+    // Reset state on branch change
+    setShouldScroll(false);
+    setScrollWidth(0);
+
+    const delay = (textLength * 30) + 1500; 
+    
+    const timer = setTimeout(() => {
+      if (containerRef.current && contentRef.current && isVisible) {
+        const containerWidth = containerRef.current.offsetWidth;
+        const contentWidth = contentRef.current.scrollWidth;
+        
+        // Trigger scrolling only if text overflows container
+        if (contentWidth > containerWidth - 20) {
+          setShouldScroll(true);
+          setScrollWidth(Math.max(contentWidth - containerWidth + 80, 100)); 
+        }
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [branchId, isVisible, textLength]);
+
+  return (
+    <div ref={containerRef} className="flex-1 h-full overflow-hidden flex items-center px-10 relative">
+      <motion.div
+        key={branchId}
+        ref={contentRef}
+        animate={shouldScroll ? { x: [0, -scrollWidth] } : { x: 0 }}
+        transition={shouldScroll ? {
+          duration: Math.max(8, scrollWidth / 40),
+          repeat: Infinity,
+          repeatType: "mirror", // Goes back and forth smoothly
+          repeatDelay: 3,
+          ease: "easeInOut"
+        } : { duration: 0 }}
+        className="flex items-center gap-4 whitespace-nowrap min-w-full"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
 };
 
 export default function BranchTickerOverlay() {
@@ -88,19 +152,21 @@ export default function BranchTickerOverlay() {
 
   useEffect(() => {
     if (notices.length <= 1) return;
-    const interval = setInterval(() => {
+    const duration = (notices[noticeIndex]?.display_duration || 10) * 1000;
+    const timer = setTimeout(() => {
       setNoticeIndex((prev) => (prev + 1) % notices.length);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [notices]);
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [notices, noticeIndex]);
 
   useEffect(() => {
     if (branches.length <= 1) return;
-    const interval = setInterval(() => {
+    const duration = (branches[branchIndex]?.display_duration || 12) * 1000;
+    const timer = setTimeout(() => {
       setBranchIndex((prev) => (prev + 1) % branches.length);
-    }, 12000); // Slightly different timing for visual interest
-    return () => clearInterval(interval);
-  }, [branches]);
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [branches, branchIndex]);
 
   const currentNotice = notices[noticeIndex];
   const currentBranch = branches[branchIndex];
@@ -155,50 +221,64 @@ export default function BranchTickerOverlay() {
             >
               <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20 relative overflow-hidden">
                  <AnimatePresence mode="wait">
-                   <motion.span 
+                   <motion.div 
                      key={`branch-name-${currentBranch.id}`}
-                     initial={{ y: '100%' }}
-                     animate={{ y: 0 }}
-                     exit={{ y: '-100%' }}
+                     initial={{ scale: 0.8, opacity: 0 }}
+                     animate={{ scale: 1, opacity: 1 }}
+                     exit={{ scale: 0.8, opacity: 0 }}
                      transition={{ duration: 0.5, ease: "easeOut" }}
-                     className="absolute text-white font-bold text-[max(1.2vw,14px)] tracking-tight text-center px-4 break-words leading-tight font-bangla"
+                     className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                     style={{ 
+                       fontSize: currentBranch.branch_name.length > 30
+                         ? 'clamp(12px, 1.0vw, 16px)'
+                         : currentBranch.branch_name.length > 22
+                           ? 'clamp(14px, 1.4vw, 22px)'
+                           : currentBranch.branch_name.length > 15
+                             ? 'clamp(15px, 1.8vw, 26px)'
+                             : 'clamp(16px, 2.2vw, 30px)' 
+                      }}
                    >
                       {currentBranch.branch_name}
-                   </motion.span>
+                   </motion.div>
                  </AnimatePresence>
               </div>
               
-              <div className="flex-1 px-10 overflow-hidden relative h-full flex items-center">
-                 <AnimatePresence mode="wait">
-                    <motion.div
-                      key={`branch-${currentBranch.id}`}
-                      initial={{ opacity: 1, x: 0 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ x: '-100%', opacity: 0 }}
-                      transition={{ duration: 0.8, ease: "easeInOut" }}
-                      className="flex items-center gap-6 whitespace-nowrap text-white"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-[max(2.2vw,24px)] tracking-tight font-bangla">
-                          <TypewritingText 
-                            text={(() => {
-                              const addr = currentBranch.bottom_message;
-                              const phone = currentBranch.phone_number;
-                              const combined = `${addr}${phone ? ` - ${phone}` : ''}`;
-                              return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
-                            })()} 
-                          />
-                        </span>
-                      </div>
-                    </motion.div>
-                 </AnimatePresence>
-              </div>
+              <Marquee 
+                isVisible={!!currentBranch} 
+                branchId={currentBranch.id}
+                textLength={currentBranch.bottom_message.length + (currentBranch.phone_number?.length || 0)}
+              >
+                 <div 
+                  className="font-medium tracking-tight font-bangla flex items-center gap-4 text-white"
+                  style={{ 
+                    fontSize: 'clamp(16px, 2.2vw, 30px)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <TypewritingText text={currentBranch.bottom_message} />
+                  {currentBranch.phone_number && (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: (currentBranch.bottom_message.length * 30 / 1000) + 0.2 }}
+                      >
+                        <Square className="w-[0.4em] h-[0.4em] fill-white text-white" />
+                      </motion.div>
+                      <TypewritingText 
+                        text={currentBranch.phone_number}
+                        delay={(currentBranch.bottom_message.length * 30) + 200}
+                      />
+                    </>
+                  )}
+                </div>
+              </Marquee>
 
               {/* Clock Section with Scrolling Animation */}
-              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-4 overflow-hidden min-w-[12%]">
+              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-2 overflow-hidden min-w-[10%]">
                 <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,16px)] tracking-tighter whitespace-nowrap">
                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).split('').map((char, i) => (
-                     <div key={i} className="relative h-[max(2.5vw,24px)] w-[0.75em] flex justify-center overflow-hidden">
+                     <div key={i} className={`relative h-[max(2.5vw,24px)] flex justify-center overflow-hidden ${char === ' ' || char === '\u00A0' ? 'w-[0.3em]' : 'w-[0.75em]'}`}>
                         <AnimatePresence mode="popLayout">
                            <motion.span
                              key={`${char}-${i}`}

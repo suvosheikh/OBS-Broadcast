@@ -28,6 +28,7 @@ import {
   Image as ImageIcon,
   MapPin,
   Phone,
+  Square,
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
 
@@ -73,6 +74,7 @@ interface TickerItem {
   branch_name: string;
   phone_number?: string;
   sort_order?: number;
+  display_duration?: number;
   is_active: boolean;
 }
 
@@ -90,22 +92,19 @@ export default function ControlPanel({ user }: { user: User }) {
   const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
   const [noticeForm, setNoticeForm] = useState({
     content: '',
-    is_active: true
+    is_active: true,
+    display_duration: 10
   });
   const [branchForm, setBranchForm] = useState({
     name: '',
     address: '',
     phone: '',
     sort_order: 0,
-    is_active: true
+    is_active: true,
+    display_duration: 12
   });
-  const [imageOverlay, setImageOverlay] = useState<ImageOverlaySettings>({
-    image_url: '',
-    location_name: 'Ryans Operations Office',
-    footer_heading: 'Our team is actively working to serve you better.',
-    footer_description: 'Ensuring faster support & service for customers across Bangladesh.',
-    is_active: true
-  });
+  const [showNoticeForm, setShowNoticeForm] = useState(false);
+  const [showBranchForm, setShowBranchForm] = useState(false);
   const [product, setProduct] = useState<Product>({
     product_name: '',
     sku: '',
@@ -184,7 +183,8 @@ export default function ControlPanel({ user }: { user: User }) {
     if (editingTickerId) {
       result = await supabase.from('branch_ticker').update({
         top_message: noticeForm.content,
-        is_active: noticeForm.is_active
+        is_active: noticeForm.is_active,
+        display_duration: noticeForm.display_duration
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
@@ -196,6 +196,7 @@ export default function ControlPanel({ user }: { user: User }) {
           branch_name: '',
           bottom_message: '',
           is_active: noticeForm.is_active,
+          display_duration: noticeForm.display_duration,
           user_id: user.id 
         }]);
     }
@@ -203,7 +204,8 @@ export default function ControlPanel({ user }: { user: User }) {
     if (result?.error) {
       alert(`SQL Error: ${result.error.message}`);
     } else {
-      setNoticeForm({ content: '', is_active: true });
+      setNoticeForm({ content: '', is_active: true, display_duration: 10 });
+      setShowNoticeForm(false);
       fetchBranches();
     }
   }
@@ -218,7 +220,8 @@ export default function ControlPanel({ user }: { user: User }) {
         bottom_message: branchForm.address,
         phone_number: branchForm.phone,
         sort_order: branchForm.sort_order,
-        is_active: branchForm.is_active
+        is_active: branchForm.is_active,
+        display_duration: branchForm.display_duration
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
@@ -232,6 +235,7 @@ export default function ControlPanel({ user }: { user: User }) {
           sort_order: branchForm.sort_order,
           top_message: '',
           is_active: branchForm.is_active,
+          display_duration: branchForm.display_duration,
           user_id: user.id 
         }]);
     }
@@ -239,7 +243,8 @@ export default function ControlPanel({ user }: { user: User }) {
     if (result?.error) {
       alert(`SQL Error: ${result.error.message}`);
     } else {
-      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true });
+      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
+      setShowBranchForm(false);
       fetchBranches();
     }
   }
@@ -249,17 +254,24 @@ export default function ControlPanel({ user }: { user: User }) {
     if (item.type === 'notice') {
       setNoticeForm({
         content: item.top_message,
-        is_active: item.is_active
+        is_active: item.is_active,
+        display_duration: item.display_duration || 10
       });
+      setShowNoticeForm(true);
+      setShowBranchForm(false);
     } else {
       setBranchForm({
         name: item.branch_name,
         address: item.bottom_message,
         phone: item.phone_number || '',
         sort_order: item.sort_order || 0,
-        is_active: item.is_active
+        is_active: item.is_active,
+        display_duration: item.display_duration || 12
       });
+      setShowBranchForm(true);
+      setShowNoticeForm(false);
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function deleteBranch(id: string) {
@@ -956,44 +968,64 @@ export default function ControlPanel({ user }: { user: User }) {
             <div className="space-y-16">
               {/* NOTICE SEGMENT */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setEditingTickerId(null);
+                      setNoticeForm({ content: '', is_active: true, display_duration: 10 });
+                      setShowNoticeForm(true);
+                      setShowBranchForm(false);
+                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-[#00a651] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Add New Notice
+                  </button>
                 </div>
-                
-                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6">
-                  <div className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-1 w-full">
+
+                {showNoticeForm && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{editingTickerId ? 'Edit' : 'New'} Notice Content</p>
+                      <button onClick={() => setShowNoticeForm(false)} className="text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="md:col-span-3">
+                        <FormInput 
+                          label="Notice Text" 
+                          placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
+                          value={noticeForm.content} 
+                          onChange={v => setNoticeForm({...noticeForm, content: v})} 
+                        />
+                      </div>
                       <FormInput 
-                        label="Notice Text" 
-                        placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
-                        value={noticeForm.content} 
-                        onChange={v => setNoticeForm({...noticeForm, content: v})} 
+                        label="Display Time (Seconds)" 
+                        type="number"
+                        value={noticeForm.display_duration.toString()} 
+                        onChange={v => setNoticeForm({...noticeForm, display_duration: parseInt(v) || 10})} 
                       />
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex gap-4">
                       <button 
                         onClick={saveNotice}
-                        className="flex-1 md:w-auto px-12 bg-[#00a651] text-white font-black uppercase tracking-widest py-4 rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                        disabled={!noticeForm.content}
+                        className="flex-1 py-4 bg-[#00a651] text-white font-bold text-xs uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-green-100 disabled:opacity-30"
                       >
-                        {editingTickerId ? 'Update Notice' : 'Add Notice'}
+                        {editingTickerId ? 'Update Notice' : 'Save Notice'}
                       </button>
-                      {editingTickerId && tickerItems.find(i => i.id === editingTickerId)?.type === 'notice' && (
-                        <button 
-                          onClick={() => {
-                            setEditingTickerId(null);
-                            setNoticeForm({ content: '', is_active: true });
-                          }}
-                          className="px-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
-                  </div>
-                  
-                  <div className="border-t border-slate-50 pt-6">
-                    <div className="overflow-x-auto">
+                  </motion.div>
+                )}
+                
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm">
+                  <div className="overflow-x-auto">
                       <table className="w-full text-left border-separate border-spacing-0">
                         <thead>
                           <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
@@ -1032,9 +1064,8 @@ export default function ControlPanel({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="w-full bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
+                <div className="w-full bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
                 <div className="flex flex-col md:flex-row items-center gap-12">
                   <div className="w-full md:w-96 space-y-3">
                     <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400">Overlay Source URL</p>
@@ -1069,14 +1100,23 @@ export default function ControlPanel({ user }: { user: User }) {
                              </span>
                           </div>
                           <div className="flex-1 px-4 text-white flex items-center overflow-hidden">
-                             <span className="text-[10px] font-medium truncate font-bangla">
+                             <div className="text-[10px] font-medium truncate font-bangla flex items-center gap-1">
                                 {(() => {
                                    const addr = previewBranch?.bottom_message || branchForm.address || 'Address Area';
                                    const phone = previewBranch?.phone_number || branchForm.phone;
-                                   const combined = `${addr}${phone ? ` - ${phone}` : ''}`;
-                                   return combined.length > 80 ? combined.substring(0, 80) + '...' : combined;
+                                   return (
+                                     <>
+                                       <span className="truncate">{addr}</span>
+                                       {phone && (
+                                         <>
+                                           <Square className="w-1.5 h-1.5 fill-white text-white shrink-0" />
+                                           <span className="shrink-0">{phone}</span>
+                                         </>
+                                       )}
+                                     </>
+                                   );
                                 })()}
-                             </span>
+                             </div>
                           </div>
                           <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
                              <span className="text-slate-900 font-bold text-[10px]">
@@ -1091,40 +1131,87 @@ export default function ControlPanel({ user }: { user: User }) {
 
               {/* BRANCH SEGMENT */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#004a99] rounded-full" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#004a99] rounded-full" />
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setEditingTickerId(null);
+                      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
+                      setShowBranchForm(true);
+                      setShowNoticeForm(false);
+                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Add New Branch
+                  </button>
                 </div>
-                
-                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <FormInput label="Branch Name" value={branchForm.name} onChange={v => setBranchForm({...branchForm, name: v})} />
-                    <FormInput label="Phone Number" value={branchForm.phone} onChange={v => setBranchForm({...branchForm, phone: v})} />
-                    <FormInput label="Address" value={branchForm.address} onChange={v => setBranchForm({...branchForm, address: v})} />
-                    <FormInput label="Order" type="number" value={branchForm.sort_order.toString()} onChange={v => setBranchForm({...branchForm, sort_order: parseInt(v) || 0})} />
-                    <div className="flex gap-2">
+
+                {showBranchForm && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm space-y-6 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{editingTickerId ? 'Edit' : 'New'} Branch Details</p>
+                      <button onClick={() => setShowBranchForm(false)} className="text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="lg:col-span-2">
+                        <FormInput 
+                          label="Branch Name" 
+                          placeholder="e.g. Multiplan Center"
+                          value={branchForm.name} 
+                          onChange={v => setBranchForm({...branchForm, name: v})} 
+                        />
+                      </div>
+                      <FormInput 
+                        label="Phone Number" 
+                        placeholder="e.g. 017XXXXXXX"
+                        value={branchForm.phone} 
+                        onChange={v => setBranchForm({...branchForm, phone: v})} 
+                      />
+                      <FormInput 
+                        label="Display Time (Seconds)" 
+                        type="number"
+                        placeholder="e.g. 12"
+                        value={branchForm.display_duration.toString()} 
+                        onChange={v => setBranchForm({...branchForm, display_duration: parseInt(v) || 12})} 
+                      />
+                      <div className="lg:col-span-3">
+                        <FormInput 
+                          label="Address" 
+                          placeholder="e.g. Shop 431, Level 4..."
+                          value={branchForm.address} 
+                          onChange={v => setBranchForm({...branchForm, address: v})} 
+                        />
+                      </div>
+                      <FormInput 
+                        label="Sort Order" 
+                        type="number"
+                        value={branchForm.sort_order.toString()} 
+                        onChange={v => setBranchForm({...branchForm, sort_order: parseInt(v) || 0})} 
+                      />
+                    </div>
+
+                    <div className="flex gap-4">
                       <button 
                         onClick={saveBranchAddress}
-                        className="flex-1 bg-[#004a99] text-white font-black uppercase tracking-widest py-4 rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                        disabled={!branchForm.name || !branchForm.address}
+                        className="flex-1 py-4 bg-[#004a99] text-white font-bold text-xs uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-blue-100 disabled:opacity-30"
                       >
-                        {editingTickerId ? 'Update Branch' : 'Add Branch'}
+                        {editingTickerId ? 'Update Branch' : 'Save Branch'}
                       </button>
-                      {editingTickerId && tickerItems.find(i => i.id === editingTickerId)?.type === 'branch' && (
-                        <button 
-                          onClick={() => {
-                            setEditingTickerId(null);
-                            setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true });
-                          }}
-                          className="px-4 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
-                  </div>
-
-                  <div className="border-t border-slate-50 pt-8">
-                    <div className="overflow-x-auto">
+                  </motion.div>
+                )}
+                
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm">
+                  <div className="overflow-x-auto">
                       <table className="w-full text-left border-separate border-spacing-0">
                         <thead>
                           <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
@@ -1201,8 +1288,7 @@ export default function ControlPanel({ user }: { user: User }) {
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
+          ) : (
           <div className="p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-12">
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6">
               <div>
