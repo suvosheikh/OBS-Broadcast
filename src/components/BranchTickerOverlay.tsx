@@ -185,7 +185,7 @@ export default function BranchTickerOverlay() {
           {currentNotice && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'max(90px, 8vh)', opacity: 1 }}
+              animate={{ height: 'max(60px, 6vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="bg-[#00a651] flex items-center overflow-hidden border-b border-white/10"
             >
@@ -215,7 +215,7 @@ export default function BranchTickerOverlay() {
           {currentBranch && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'max(90px, 8vh)', opacity: 1 }}
+              animate={{ height: 'max(60px, 6vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="bg-[#004a99] flex items-center overflow-hidden"
             >
