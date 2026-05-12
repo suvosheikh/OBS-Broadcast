@@ -253,9 +253,9 @@ export default function BranchTickerOverlay() {
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: '-100%', opacity: 0 }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="absolute text-white font-bold tracking-tight text-center px-1.5 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                    className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.2] font-bangla w-full h-full flex items-center justify-center break-words"
                     style={{ 
-                      fontSize: 'clamp(18px, 2.3vw, 28px)'
+                      fontSize: 'clamp(22px, 2.6vw, 34px)'
                     }}
                   >
                     নোটিশ
@@ -300,15 +300,11 @@ export default function BranchTickerOverlay() {
                      animate={{ x: 0, opacity: 1 }}
                      exit={{ x: '100%', opacity: 0 }}
                      transition={{ duration: 0.5, ease: "easeInOut" }}
-                     className="absolute text-white font-bold tracking-tight text-center px-1.5 leading-[1.0] font-bangla w-full h-full flex items-center justify-center break-words"
-                     style={{ 
-                       fontSize: currentBranch.branch_name.length > 20 
-                        ? 'clamp(14px, 1.6vw, 20px)'
-                        : currentBranch.branch_name.length > 12
-                          ? 'clamp(16px, 2.0vw, 24px)'
-                          : 'clamp(18px, 2.3vw, 28px)'
+                     className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                      style={{ 
+                        fontSize: 'clamp(22px, 2.6vw, 34px)'
                       }}
-                   >
+                    >
                       {currentBranch.branch_name}
                    </motion.div>
                  </AnimatePresence>
