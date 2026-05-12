@@ -74,7 +74,7 @@ const Marquee = ({ children, isVisible, textLength, branchId }: { children: Reac
   }, [branchId, isVisible, textLength]);
 
   return (
-    <div ref={containerRef} className="flex-1 h-full overflow-hidden flex items-center px-10 relative">
+    <div ref={containerRef} className="flex-1 h-full overflow-hidden flex items-center px-4 relative">
       <motion.div
         key={branchId}
         ref={contentRef}
@@ -192,7 +192,7 @@ export default function BranchTickerOverlay() {
               <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20">
                  <span className="text-white font-black text-[max(2.5vw,24px)] tracking-tighter italic font-bangla">নোটিশ</span>
               </div>
-              <div className="flex-1 px-10 overflow-hidden relative h-full flex items-center">
+              <div className="flex-1 px-4 overflow-hidden relative h-full flex items-center">
                  <AnimatePresence mode="wait">
                     <motion.div
                       key={`notice-${currentNotice.id}`}
@@ -275,10 +275,10 @@ export default function BranchTickerOverlay() {
               </Marquee>
 
               {/* Clock Section with Scrolling Animation */}
-              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-2 overflow-hidden min-w-[10%]">
+              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-3 overflow-hidden min-w-fit">
                 <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,16px)] tracking-tighter whitespace-nowrap">
-                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).split('').map((char, i) => (
-                     <div key={i} className={`relative h-[max(2.5vw,24px)] flex justify-center overflow-hidden ${char === ' ' || char === '\u00A0' ? 'w-[0.3em]' : 'w-[0.75em]'}`}>
+                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase().split('').map((char, i) => (
+                     <div key={i} className={`relative h-[max(2.5vw,24px)] flex justify-center overflow-hidden ${char === ' ' || char === '\u00A0' ? 'w-[0.2em]' : (char === ':' ? 'w-[0.3em]' : (char === 'M' || char === 'W' ? 'w-[0.85em]' : 'w-[0.65em]'))}`}>
                         <AnimatePresence mode="popLayout">
                            <motion.span
                              key={`${char}-${i}`}
