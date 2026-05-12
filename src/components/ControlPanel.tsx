@@ -135,6 +135,13 @@ export default function ControlPanel({ user }: { user: User }) {
 
   const [currentBranchIndex, setCurrentBranchIndex] = useState(0);
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
+  const [imageOverlay, setImageOverlay] = useState({
+    image_url: '',
+    is_active: false,
+    width: '300px',
+    position: 'bottom-right',
+    opacity: 100
+  });
 
   useEffect(() => {
     const activeNotices = tickerItems.filter(i => i.type === 'notice' && i.is_active);
@@ -308,8 +315,32 @@ export default function ControlPanel({ user }: { user: User }) {
     setDeleteTarget(null);
   }
 
-  async function toggleBranchStatus(id: string, current: boolean) {
+  async function toggleTickerItemStatus(id: string, current: boolean, type: string) {
+    // 1. Update the item
     await supabase.from('branch_ticker').update({ is_active: !current }).eq('id', id);
+    
+    // 2. Fetch fresh active counts
+    const { data: items } = await supabase
+      .from('branch_ticker')
+      .select('type, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    const activeNotices = items?.filter(i => i.type === 'notice').length || 0;
+    const activeBranches = items?.filter(i => i.type !== 'notice').length || 0;
+
+    // 3. Sync master settings
+    const { data: settings } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
+    if (settings) {
+      let updates: any = {};
+      if (activeNotices === 0 && settings.notice_section_enabled) updates.notice_section_enabled = false;
+      if (activeBranches === 0 && settings.branch_section_enabled) updates.branch_section_enabled = false;
+      
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('settings').update(updates).eq('id', settings.id);
+      }
+    }
+
     fetchBranches();
   }
 
@@ -1043,7 +1074,7 @@ export default function ControlPanel({ user }: { user: User }) {
                               <td className="py-4 font-medium text-xs text-slate-800">{item.top_message}</td>
                               <td className="py-4 text-center">
                                 <button 
-                                  onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                                  onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'notice')}
                                   className={cn("p-2 rounded-lg border transition-all", item.is_active ? "bg-green-50 text-green-600 border-green-100" : "bg-slate-50 text-slate-400 border-slate-100")}
                                 >
                                   {item.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -1254,7 +1285,7 @@ export default function ControlPanel({ user }: { user: User }) {
                                     {item.is_active ? 'Active' : 'Inactive'}
                                   </span>
                                   <button 
-                                    onClick={() => toggleBranchStatus(item.id!, item.is_active)}
+                                    onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
                                     className={cn(
                                       "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
                                       item.is_active ? "bg-[#00a651]" : "bg-slate-200"

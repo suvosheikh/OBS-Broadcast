@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -108,10 +108,14 @@ export default function BranchTickerOverlay() {
 
   useEffect(() => {
     async function fetchSettings() {
+      if (!userId) return;
+      
       const { data } = await supabase
         .from('settings')
         .select('*')
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
+
       if (data) {
         setGlobalSettings({
           notice_section_enabled: data.notice_section_enabled,
@@ -121,54 +125,68 @@ export default function BranchTickerOverlay() {
     }
 
     async function fetchItems() {
-      let query = supabase
+      if (!userId) return;
+      
+      const { data, error } = await supabase
         .from('branch_ticker')
         .select('*')
-        .eq('is_active', true)
+        .eq('user_id', userId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
-      
-      if (userId) {
-        query = query.eq('user_id', userId);
-      }
 
-      const { data, error } = await query;
       if (error) {
         console.error("Error fetching branch ticker items:", error);
         return;
       }
+      
       const allItems = (data || []) as TickerItem[];
-      console.log("Fetched items:", allItems);
-      setNotices(allItems.filter(i => i.type === 'notice'));
-      setBranches(allItems.filter(i => i.type === 'branch' || i.type === 'branch_address' || !i.type));
+      const activeNotices = allItems.filter(i => i.type === 'notice' && i.is_active);
+      const activeBranches = allItems.filter(i => (i.type === 'branch' || i.type === 'branch_address' || !i.type) && i.is_active);
+      
+      setNotices(activeNotices);
+      setBranches(activeBranches);
     }
 
     fetchSettings();
     fetchItems();
 
     const tickerChannel = supabase
-      .channel('branch_ticker_realtime')
+      .channel(`ticker_changes_${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'branch_ticker' },
-        (payload) => {
-          console.log("Realtime update received:", payload);
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'branch_ticker',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
           fetchItems();
         }
       )
       .subscribe();
 
     const settingsChannel = supabase
-      .channel('settings_realtime')
+      .channel(`settings_changes_${userId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'settings' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'settings',
+          filter: `user_id=eq.${userId}`
+        },
         (payload) => {
-          console.log("Settings update received:", payload);
-          setGlobalSettings({
-            notice_section_enabled: payload.new.notice_section_enabled,
-            branch_section_enabled: payload.new.branch_section_enabled
-          });
+          console.log("Settings changed:", payload);
+          if (payload.new) {
+            const newSettings = payload.new as any;
+            setGlobalSettings({
+              notice_section_enabled: newSettings.notice_section_enabled,
+              branch_section_enabled: newSettings.branch_section_enabled
+            });
+            // Force re-fetch items to ensure indices are correct if something was disabled
+            fetchItems();
+          }
         }
       )
       .subscribe();
@@ -200,12 +218,12 @@ export default function BranchTickerOverlay() {
     return () => clearTimeout(timer);
   }, [branches, branchIndex]);
 
-  const currentNotice = notices[noticeIndex];
-  const currentBranch = branches[branchIndex];
-
   // Only show if at least one section is enabled AND there's content for it
-  const showNoticeLine = globalSettings.notice_section_enabled && currentNotice;
-  const showBranchLine = globalSettings.branch_section_enabled && currentBranch;
+  const showNoticeLine = globalSettings.notice_section_enabled && (notices.length > 0);
+  const showBranchLine = globalSettings.branch_section_enabled && (branches.length > 0);
+
+  const currentNotice = notices.length > 0 ? notices[noticeIndex % notices.length] : null;
+  const currentBranch = branches.length > 0 ? branches[branchIndex % branches.length] : null;
 
   if (!showNoticeLine && !showBranchLine) {
     return <div className="w-screen h-screen bg-transparent" />;
@@ -227,8 +245,22 @@ export default function BranchTickerOverlay() {
               transition={{ duration: 0.4 }}
               className="bg-[#00a651] flex items-center overflow-hidden border-b border-white/10"
             >
-              <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20">
-                 <span className="text-white font-medium text-[max(2.5vw,24px)] tracking-tighter font-bangla">নোটিশ</span>
+              <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20 relative overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key="notice-header-text"
+                    initial={{ x: '-100%', opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: '-100%', opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute text-white font-bold tracking-tight text-center px-1.5 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                    style={{ 
+                      fontSize: 'clamp(18px, 2.3vw, 28px)'
+                    }}
+                  >
+                    নোটিশ
+                  </motion.div>
+                </AnimatePresence>
               </div>
               <Marquee 
                 isVisible={!!currentNotice} 
@@ -236,9 +268,10 @@ export default function BranchTickerOverlay() {
                 textLength={currentNotice?.top_message.length || 0}
               >
                 <div 
-                  className="text-white font-normal font-bangla whitespace-nowrap"
+                  className="font-medium tracking-tight font-bangla flex items-center gap-4 text-white"
                   style={{ 
                     fontSize: 'clamp(16px, 2.2vw, 30px)',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   <TypewritingText text={currentNotice?.top_message || ''} />
@@ -260,22 +293,20 @@ export default function BranchTickerOverlay() {
               className="bg-[#004a99] flex items-center overflow-hidden"
             >
               <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20 relative overflow-hidden">
-                 <AnimatePresence mode="wait">
+                 <AnimatePresence mode="popLayout">
                    <motion.div 
-                     key={`branch-name-${currentBranch.id}`}
+                     key={currentBranch.id}
                      initial={{ x: '-100%', opacity: 0 }}
                      animate={{ x: 0, opacity: 1 }}
-                     exit={{ x: '-100%', opacity: 0 }}
-                     transition={{ duration: 0.5, ease: "easeOut" }}
-                     className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                     exit={{ x: '100%', opacity: 0 }}
+                     transition={{ duration: 0.5, ease: "easeInOut" }}
+                     className="absolute text-white font-bold tracking-tight text-center px-1.5 leading-[1.0] font-bangla w-full h-full flex items-center justify-center break-words"
                      style={{ 
-                       fontSize: currentBranch.branch_name.length > 30
-                         ? 'clamp(12px, 1.0vw, 16px)'
-                         : currentBranch.branch_name.length > 22
-                           ? 'clamp(14px, 1.4vw, 22px)'
-                           : currentBranch.branch_name.length > 15
-                             ? 'clamp(15px, 1.8vw, 26px)'
-                             : 'clamp(16px, 2.2vw, 30px)' 
+                       fontSize: currentBranch.branch_name.length > 20 
+                        ? 'clamp(14px, 1.6vw, 20px)'
+                        : currentBranch.branch_name.length > 12
+                          ? 'clamp(16px, 2.0vw, 24px)'
+                          : 'clamp(18px, 2.3vw, 28px)'
                       }}
                    >
                       {currentBranch.branch_name}
