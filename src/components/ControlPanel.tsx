@@ -29,8 +29,10 @@ import {
   MapPin,
   Phone,
   Square,
+  Sliders,
 } from 'lucide-react';
 import { cn, getAppUrl } from '../lib/utils';
+import { SettingsWizard } from './SettingsWizard';
 
 interface Product {
   id?: string;
@@ -105,6 +107,7 @@ export default function ControlPanel({ user }: { user: User }) {
   });
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [product, setProduct] = useState<Product>({
     product_name: '',
     sku: '',
@@ -1136,17 +1139,25 @@ export default function ControlPanel({ user }: { user: User }) {
                     <span className="w-2 h-2 bg-[#004a99] rounded-full" />
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setEditingTickerId(null);
-                      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
-                      setShowBranchForm(true);
-                      setShowNoticeForm(false);
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
-                  >
-                    <Plus className="w-4 h-4" /> Add New Branch
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="flex items-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-bold uppercase tracking-widest rounded-xl hover:bg-red-50 transition-all text-[10px] shadow-sm"
+                    >
+                      <Sliders className="w-4 h-4" /> Control Panel
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setEditingTickerId(null);
+                        setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
+                        setShowBranchForm(true);
+                        setShowNoticeForm(false);
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" /> Add New Branch
+                    </button>
+                  </div>
                 </div>
 
                 {showBranchForm && (
@@ -1520,6 +1531,10 @@ export default function ControlPanel({ user }: { user: User }) {
             </div>
           </div>
         )}
+        <SettingsWizard 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+        />
       </main>
 
       {/* Delete Confirmation Wizard */}
