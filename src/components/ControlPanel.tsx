@@ -81,8 +81,10 @@ interface TickerItem {
 }
 
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner' | 'branch-address'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner' | 'branch-address' | 'users'>('dashboard');
   const [stats, setStats] = useState({ today: 0, total: 0 });
+  const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer'>('viewer');
+  const [usersBoard, setUsersBoard] = useState<any[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [winners, setWinners] = useState<WinnerData[]>([]);
   const [winnerForm, setWinnerForm] = useState<WinnerData>({
@@ -169,13 +171,101 @@ export default function ControlPanel({ user }: { user: User }) {
     fetchImageOverlay();
     fetchWinners();
     fetchBranches();
+    fetchUserProfile();
+
+    // Subscribe to real-time changes for the current user's profile
+    const profileSubscription = supabase
+      .channel(`profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log("Profile updated in real-time:", payload.new);
+          if (payload.new && payload.new.role) {
+            setUserRole(payload.new.role as 'admin' | 'editor' | 'viewer');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileSubscription);
+    };
   }, [user.id]);
+
+  async function fetchUserProfile() {
+    try {
+      console.log("Fetching profile for user ID:", user.id);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role, email')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Supabase error fetching profile:", error);
+        return;
+      }
+
+      if (data) {
+        console.log("Successfully fetched profile. Role is:", data.role);
+        setUserRole(data.role as 'admin' | 'editor' | 'viewer');
+      } else {
+        // Fallback: If profile doesn't exist at all, try to create it as viewer
+        console.log("Profile row not found in table. Attempting to create one...");
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, email: user.email, role: 'viewer' });
+        
+        if (insertError) {
+          console.error("Failed to auto-create profile:", insertError);
+        } else {
+          console.log("Created default viewer profile.");
+          setUserRole('viewer');
+        }
+      }
+    } catch (err) {
+      console.error("Critical error in fetchUserProfile:", err);
+    }
+  }
+
+  async function fetchAllUsers() {
+    if (userRole !== 'admin') return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setUsersBoard(data || []);
+  }
+
+  useEffect(() => {
+    if (activeTab === 'users' && userRole === 'admin') {
+      fetchAllUsers();
+    }
+  }, [activeTab, userRole]);
+
+  async function updateUserRole(targetUserId: string, newRole: string) {
+    if (userRole !== 'admin') return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', targetUserId);
+    
+    if (!error) {
+      alert("User role updated!");
+      fetchAllUsers();
+    }
+  }
 
   async function fetchBranches() {
     const { data, error } = await supabase
       .from('branch_ticker')
       .select('*')
-      .eq('user_id', user.id)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
     
@@ -187,6 +277,7 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function saveNotice() {
+    if (userRole === 'viewer') return;
     if (!noticeForm.content) return;
     
     let result;
@@ -221,6 +312,7 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function saveBranchAddress() {
+    if (userRole === 'viewer') return;
     if (!branchForm.name || !branchForm.address) return;
     
     let result;
@@ -323,7 +415,6 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data: items } = await supabase
       .from('branch_ticker')
       .select('type, is_active')
-      .eq('user_id', user.id)
       .eq('is_active', true);
 
     const activeNotices = items?.filter(i => i.type === 'notice').length || 0;
@@ -348,21 +439,17 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data, error } = await supabase
       .from('winners')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
     if (error) {
       console.error("Error fetching winners:", error);
-      // Only alert if it's a real error, not just an empty result
-      if (error.code !== 'PGRST116') { // PGRST116 is often 'no rows' but sometimes table missing
-         // alert(`Database Error: ${error.message}. Please ensure the 'winners' table exists.`);
-      }
     } else {
       setWinners(data || []);
     }
   }
 
   async function saveWinner() {
+    if (userRole === 'viewer') return;
     if (!winnerForm.subject || !winnerForm.bill_no || !winnerForm.gift_name) {
       alert("Please fill all fields: Subject, Bill No, and Gift Name.");
       return;
@@ -407,7 +494,7 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data } = await supabase
       .from('image_overlays')
       .select('*')
-      .eq('user_id', user.id)
+      .limit(1)
       .maybeSingle();
     
     if (data) {
@@ -416,6 +503,10 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function saveImageOverlay() {
+    if (userRole !== 'admin') {
+      alert("Only admins can change global overlay images.");
+      return;
+    }
     const { error } = await supabase
       .from('image_overlays')
       .upsert({
@@ -438,13 +529,11 @@ export default function ControlPanel({ user }: { user: User }) {
 
     const { count: totalCount } = await supabase
       .from('toast_history')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
+      .select('*', { count: 'exact', head: true });
 
     const { count: todayCount } = await supabase
       .from('toast_history')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
       .gte('created_at', today.toISOString());
 
     setStats({
@@ -457,7 +546,6 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data } = await supabase
       .from('toast_history')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10);
     
@@ -469,7 +557,6 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data } = await supabase
       .from('products')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
     setSavedProducts(data || []);
@@ -611,13 +698,35 @@ export default function ControlPanel({ user }: { user: User }) {
           <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
           <NavItem tab="overlay-winner" icon={Trophy} label="Overlay Winner" />
           <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
+          {userRole === 'admin' && (
+            <NavItem tab="users" icon={Users} label="User Roles" />
+          )}
         </nav>
 
         <div className="p-6 border-t border-slate-50 space-y-4">
           <div className="bg-slate-50 rounded-xl p-4">
-             <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1 truncate">Current Operator</p>
-             <p className="text-xs font-bold text-slate-700 truncate">{user.email}</p>
-          </div>
+                 <div className="flex items-center justify-between mb-1">
+                   <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest truncate">Current Operator</p>
+                   <button 
+                    onClick={fetchUserProfile}
+                    className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                    title="Refresh Role"
+                   >
+                     <RefreshCcw className="w-2.5 h-2.5 text-slate-400" />
+                   </button>
+                 </div>
+                 <div className="flex items-center justify-between">
+                   <p className="text-xs font-bold text-slate-700 truncate">{user.email}</p>
+                   <span className={cn(
+                     "text-[8px] px-1.5 py-0.5 rounded font-black uppercase border",
+                     userRole === 'admin' ? "bg-red-50 text-red-600 border-red-100" :
+                     userRole === 'editor' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                     "bg-slate-100 text-slate-500 border-slate-200"
+                   )}>
+                     {userRole}
+                   </span>
+                 </div>
+              </div>
           <button 
             onClick={signOut}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
@@ -880,7 +989,7 @@ export default function ControlPanel({ user }: { user: User }) {
                   <button 
                     id="add-winner-btn"
                     onClick={saveWinner}
-                    disabled={!winnerForm.subject || !winnerForm.bill_no || !winnerForm.gift_name}
+                    disabled={userRole === 'viewer' || !winnerForm.subject || !winnerForm.bill_no || !winnerForm.gift_name}
                     className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-30 text-[10px] flex items-center justify-center gap-3 shadow-xl"
                   >
                     <Plus className="w-4 h-4" /> Add to List
@@ -913,21 +1022,25 @@ export default function ControlPanel({ user }: { user: User }) {
                           </div>
                           <div className="flex items-center gap-2">
                              <button 
-                               onClick={() => toggleWinnerVisibility(w.id!, w.is_visible)}
+                               onClick={() => toggleWinnerVisibility(w.id!, w.is_active)}
+                               disabled={userRole === 'viewer'}
                                className={cn(
                                  "p-2 rounded-lg border transition-all",
-                                 w.is_visible ? "bg-green-50 border-green-200 text-green-600" : "bg-slate-50 border-slate-200 text-slate-400"
+                                 w.is_visible ? "bg-green-50 border-green-200 text-green-600" : "bg-slate-50 border-slate-200 text-slate-400",
+                                 userRole === 'viewer' && "opacity-50 cursor-not-allowed"
                                )}
                                title={w.is_visible ? "Hide for Overlay" : "Show for Overlay"}
                              >
                                <Eye className="w-4 h-4" />
                              </button>
-                             <button 
-                               onClick={() => deleteWinner(w.id!)}
-                               className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-400 hover:text-red-600 transition-all"
-                             >
-                               <Trash2 className="w-4 h-4" />
-                             </button>
+                             {userRole !== 'viewer' && (
+                               <button 
+                                 onClick={() => deleteWinner(w.id!)}
+                                 className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-400 hover:text-red-600 transition-all"
+                               >
+                                 <Trash2 className="w-4 h-4" />
+                               </button>
+                             )}
                           </div>
                         </div>
                       ))
@@ -1009,12 +1122,14 @@ export default function ControlPanel({ user }: { user: User }) {
                   </div>
                   <button 
                     onClick={() => {
+                      if (userRole === 'viewer') return;
                       setEditingTickerId(null);
                       setNoticeForm({ content: '', is_active: true, display_duration: 10 });
                       setShowNoticeForm(true);
                       setShowBranchForm(false);
                     }}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#00a651] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                    disabled={userRole === 'viewer'}
+                    className="flex items-center gap-2 px-6 py-3 bg-[#00a651] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" /> Add New Notice
                   </button>
@@ -1171,20 +1286,24 @@ export default function ControlPanel({ user }: { user: User }) {
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="flex items-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-bold uppercase tracking-widest rounded-xl hover:bg-red-50 transition-all text-[10px] shadow-sm"
-                    >
-                      <Sliders className="w-4 h-4" /> Control Panel
-                    </button>
+                    {userRole === 'admin' && (
+                      <button 
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="flex items-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-bold uppercase tracking-widest rounded-xl hover:bg-red-50 transition-all text-[10px] shadow-sm"
+                      >
+                        <Sliders className="w-4 h-4" /> Control Panel
+                      </button>
+                    )}
                     <button 
                       onClick={() => {
+                        if (userRole === 'viewer') return;
                         setEditingTickerId(null);
                         setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
                         setShowBranchForm(true);
                         setShowNoticeForm(false);
                       }}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                      disabled={userRole === 'viewer'}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-4 h-4" /> Add New Branch
                     </button>
@@ -1285,10 +1404,12 @@ export default function ControlPanel({ user }: { user: User }) {
                                     {item.is_active ? 'Active' : 'Inactive'}
                                   </span>
                                   <button 
-                                    onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
+                                    onClick={() => userRole !== 'viewer' && toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
+                                    disabled={userRole === 'viewer'}
                                     className={cn(
                                       "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                                      item.is_active ? "bg-[#00a651]" : "bg-slate-200"
+                                      item.is_active ? "bg-[#00a651]" : "bg-slate-200",
+                                      userRole === 'viewer' && "opacity-50 cursor-not-allowed"
                                     )}
                                   >
                                     <span
@@ -1302,20 +1423,24 @@ export default function ControlPanel({ user }: { user: User }) {
                               </td>
                               <td className="py-5 text-right text-actions-cell">
                                 <div className="flex justify-end gap-2">
-                                  <button 
-                                    onClick={() => editTickerItem(item)}
-                                    className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
-                                    title="Edit"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button 
-                                    onClick={() => deleteBranch(item.id!)}
-                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  {userRole !== 'viewer' && (
+                                    <button 
+                                      onClick={() => editTickerItem(item)}
+                                      className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {userRole !== 'viewer' && (
+                                    <button 
+                                      onClick={() => deleteBranch(item.id!)}
+                                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1328,6 +1453,74 @@ export default function ControlPanel({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : activeTab === 'users' && userRole === 'admin' ? (
+            <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-8">
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">User Management</h2>
+                <p className="text-slate-500 mt-2">Manage access levels for your broadcast station staff.</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">User Email</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Current Role</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {usersBoard.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs uppercase">
+                              {u.email?.[0]}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700">{u.email}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-4">
+                          <span className={cn(
+                            "text-[10px] px-2 py-1 rounded-full font-black uppercase border",
+                            u.role === 'admin' ? "bg-red-50 text-red-600 border-red-100" :
+                            u.role === 'editor' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                            "bg-slate-100 text-slate-500 border-slate-200"
+                          )}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4 text-right">
+                          <select 
+                            value={u.role}
+                            onChange={(e) => updateUserRole(u.id, e.target.value)}
+                            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all cursor-pointer"
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="editor">Editor</option>
+                            <option value="viewer">Viewer</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl flex items-start gap-4">
+                 <div className="p-2 bg-blue-100 rounded-lg">
+                   <Settings className="w-5 h-5 text-blue-600" />
+                 </div>
+                 <div>
+                    <h4 className="text-sm font-bold text-blue-900">Permissions Logic</h4>
+                    <ul className="mt-2 space-y-1">
+                      <li className="text-xs text-blue-700">• <strong>Admin:</strong> Full access to all data, settings, and user roles.</li>
+                      <li className="text-xs text-blue-700">• <strong>Editor:</strong> Can add and edit data, but cannot change global settings or roles.</li>
+                      <li className="text-xs text-blue-700">• <strong>Viewer:</strong> Read-only access to dashboards and lists.</li>
+                    </ul>
+                 </div>
               </div>
             </div>
           ) : (
