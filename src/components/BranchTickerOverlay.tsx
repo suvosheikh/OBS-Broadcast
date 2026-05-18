@@ -108,12 +108,10 @@ export default function BranchTickerOverlay() {
 
   useEffect(() => {
     async function fetchSettings() {
-      if (!userId) return;
-      
       const { data } = await supabase
         .from('settings')
         .select('*')
-        .eq('user_id', userId)
+        .limit(1)
         .maybeSingle();
 
       if (data) {
@@ -125,12 +123,9 @@ export default function BranchTickerOverlay() {
     }
 
     async function fetchItems() {
-      if (!userId) return;
-      
       const { data, error } = await supabase
         .from('branch_ticker')
         .select('*')
-        .eq('user_id', userId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
 
@@ -151,14 +146,13 @@ export default function BranchTickerOverlay() {
     fetchItems();
 
     const tickerChannel = supabase
-      .channel(`ticker_changes_${userId}`)
+      .channel('ticker_changes_global')
       .on(
         'postgres_changes',
         { 
           event: '*', 
           schema: 'public', 
-          table: 'branch_ticker',
-          filter: `user_id=eq.${userId}`
+          table: 'branch_ticker'
         },
         () => {
           fetchItems();
@@ -167,14 +161,13 @@ export default function BranchTickerOverlay() {
       .subscribe();
 
     const settingsChannel = supabase
-      .channel(`settings_changes_${userId}`)
+      .channel('settings_changes_global')
       .on(
         'postgres_changes',
         { 
           event: '*', 
           schema: 'public', 
-          table: 'settings',
-          filter: `user_id=eq.${userId}`
+          table: 'settings'
         },
         (payload) => {
           console.log("Settings changed:", payload);

@@ -421,7 +421,7 @@ export default function ControlPanel({ user }: { user: User }) {
     const activeBranches = items?.filter(i => i.type !== 'notice').length || 0;
 
     // 3. Sync master settings
-    const { data: settings } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
+    const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle();
     if (settings) {
       let updates: any = {};
       if (activeNotices === 0 && settings.notice_section_enabled) updates.notice_section_enabled = false;
@@ -695,7 +695,9 @@ export default function ControlPanel({ user }: { user: User }) {
         <nav className="flex-1 px-4 space-y-2 mt-4">
           <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem tab="overlay-input" icon={Eye} label="Overlay Engine" />
-          <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
+          {userRole === 'admin' && (
+            <NavItem tab="overlay-image" icon={ImageIcon} label="Overlay Image" />
+          )}
           <NavItem tab="overlay-winner" icon={Trophy} label="Overlay Winner" />
           <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
           {userRole === 'admin' && (
@@ -1106,10 +1108,20 @@ export default function ControlPanel({ user }: { user: User }) {
             </div>
           </div>
         ) : activeTab === 'branch-address' ? (
-          <div className="p-8 lg:p-12 max-w-[1600px] mx-auto flex flex-col gap-12">
-            <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ticker Segments</h2>
-              <p className="text-slate-500 mt-2">Independently manage Notice and Branch address segments for your live ticker.</p>
+          <div className="p-8 lg:p-12 max-w-6xl mx-auto flex flex-col gap-12">
+            <div className="flex flex-col md:flex-row justify-between md:items-end gap-6">
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ticker Segments</h2>
+                <p className="text-slate-500 mt-2">Independently manage Notice and Branch address segments for your live ticker.</p>
+              </div>
+              {userRole === 'admin' && (
+                <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-bold uppercase tracking-widest rounded-xl hover:bg-red-50 transition-all text-[10px] shadow-sm self-start md:self-auto"
+                >
+                  <Sliders className="w-4 h-4" /> Global Control Panel
+                </button>
+              )}
             </div>
 
             <div className="space-y-16">
@@ -1286,14 +1298,6 @@ export default function ControlPanel({ user }: { user: User }) {
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
                   </div>
                   <div className="flex items-center gap-4">
-                    {userRole === 'admin' && (
-                      <button 
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="flex items-center gap-2 px-6 py-3 border-2 border-red-600 text-red-600 font-bold uppercase tracking-widest rounded-xl hover:bg-red-50 transition-all text-[10px] shadow-sm"
-                      >
-                        <Sliders className="w-4 h-4" /> Control Panel
-                      </button>
-                    )}
                     <button 
                       onClick={() => {
                         if (userRole === 'viewer') return;

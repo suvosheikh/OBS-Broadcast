@@ -18,20 +18,13 @@ export default function WinnerOverlay() {
   useEffect(() => {
     async function fetchWinners() {
       try {
-        console.log("Fetching winners for:", userId || "all users");
-        let query = supabase
+        const { data, error } = await supabase
           .from('winners')
           .select('*')
           .eq('is_visible', true)
           .order('created_at', { ascending: false });
         
-        if (userId) {
-          query = query.eq('user_id', userId);
-        }
-
-        const { data, error } = await query;
         if (error) throw error;
-        console.log("Winners fetched:", data?.length);
         setWinners(data || []);
       } catch (err) {
         console.error("Winner Overlay Error:", err);

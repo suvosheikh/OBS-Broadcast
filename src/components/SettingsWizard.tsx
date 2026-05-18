@@ -28,11 +28,11 @@ export function SettingsWizard({ isOpen, onClose }: { isOpen: boolean; onClose: 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Fetch current settings (or create if missing)
+      // 1. Fetch current settings (shared row)
       let { data, error } = await supabase
         .from('settings')
         .select('*')
-        .eq('user_id', user.id)
+        .limit(1)
         .maybeSingle();
       
       if (error && error.code !== 'PGRST116') throw error;
@@ -40,18 +40,17 @@ export function SettingsWizard({ isOpen, onClose }: { isOpen: boolean; onClose: 
       if (!data) {
         const { data: newData, error: insertError } = await supabase
           .from('settings')
-          .insert([{ user_id: user.id }])
+          .insert([{ notice_section_enabled: true, branch_section_enabled: true }])
           .select()
           .single();
         if (insertError) throw insertError;
         data = newData;
       }
 
-      // 2. Fetch active counts to see if master controls *should* be enabled
+      // 2. Fetch active counts for ALL items (shared)
       const { data: items } = await supabase
         .from('branch_ticker')
         .select('type, is_active')
-        .eq('user_id', user.id)
         .eq('is_active', true);
 
       const counts = {

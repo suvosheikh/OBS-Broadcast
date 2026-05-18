@@ -18,17 +18,14 @@ export default function Overlay() {
   const [activeToast, setActiveToast] = useState<Product | null>(null);
 
   useEffect(() => {
-    // Listen to real-time broadcast events
+    // Listen to real-time broadcast events (all broadcasts are global now)
     const channel = supabase
       .channel('obs_alerts')
       .on(
         'broadcast',
         { event: 'new_toast' },
         (payload) => {
-          // If userId provided in URL, filter by it. Otherwise show all broadcasts (static route)
-          if (!userId || payload.payload.user_id === userId) {
-            triggerToast(payload.payload);
-          }
+          triggerToast(payload.payload);
         }
       )
       .subscribe();
