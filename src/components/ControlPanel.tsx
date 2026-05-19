@@ -834,13 +834,15 @@ export default function ControlPanel({ user }: { user: User }) {
                                   return (
                                     <div className="flex flex-col items-center gap-1">
                                       <button 
-                                        onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'notice')}
+                                        onClick={() => hasPermission('notices', 'edit') && toggleTickerItemStatus(item.id!, item.is_active, 'notice')}
+                                        disabled={!hasPermission('notices', 'edit')}
                                         className={cn(
                                           "p-2 rounded-lg border transition-all", 
                                           effectivelyActive ? "bg-green-50 text-green-600 border-green-100" : 
                                           isExpired ? "bg-red-50 text-red-400 border-red-100 opacity-50" :
                                           isUpcoming ? "bg-blue-50 text-blue-600 border-blue-100" :
-                                          "bg-slate-50 text-slate-400 border-slate-100"
+                                          "bg-slate-50 text-slate-400 border-slate-100",
+                                          !hasPermission('notices', 'edit') && "opacity-50 cursor-not-allowed"
                                         )}
                                       >
                                         {item.is_active && !isExpired ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
