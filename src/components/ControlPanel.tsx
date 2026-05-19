@@ -17,6 +17,7 @@ import {
   Search,
   Menu,
   LayoutDashboard,
+  Shield,
   Zap,
   CheckCircle2,
   Copy,
@@ -79,9 +80,23 @@ interface TickerItem {
 }
 
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'branch-address' | 'users' | 'profile'>('branch-address');
+  const [activeTab, setActiveTab] = useState<'branch-address' | 'users' | 'profile' | 'access-control'>('branch-address');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer'>('viewer');
+  const [permissions, setPermissions] = useState<any[]>([]);
+
+  // Helper to check permission
+  const hasPermission = (section: 'branches' | 'notices' | 'users', action: 'view' | 'add' | 'edit' | 'delete') => {
+    if (userRole === 'admin') return true;
+    const perm = permissions.find(p => p.role === userRole && p.section === section);
+    if (!perm) return action === 'view'; // Default to view only if not found
+    if (action === 'view') return perm.can_view;
+    if (action === 'add') return perm.can_add;
+    if (action === 'edit') return perm.can_edit;
+    if (action === 'delete') return perm.can_delete;
+    return false;
+  };
+
   const [usersBoard, setUsersBoard] = useState<any[]>([]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -194,11 +209,17 @@ export default function ControlPanel({ user }: { user: User }) {
     return raw[currentBranchIndex % (raw.length || 1)];
   }, [tickerItems, currentBranchIndex]);
 
+  async function fetchPermissions() {
+    const { data } = await supabase.from('role_permissions').select('*');
+    if (data) setPermissions(data);
+  }
+
   useEffect(() => {
     fetchStats();
     fetchHistory();
     fetchBranches();
     fetchUserProfile();
+    fetchPermissions();
 
     // Subscribe to real-time changes for the current user's profile
     const profileSubscription = supabase
@@ -306,7 +327,7 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function saveNotice() {
-    if (userRole === 'viewer') return;
+    if (!hasPermission('notices', editingTickerId ? 'edit' : 'add')) return;
     if (!noticeForm.content) return;
     
     let result;
@@ -355,7 +376,7 @@ export default function ControlPanel({ user }: { user: User }) {
   }
 
   async function saveBranchAddress() {
-    if (userRole === 'viewer') return;
+    if (!hasPermission('branches', editingTickerId ? 'edit' : 'add')) return;
     if (!branchForm.name || !branchForm.address) return;
     
     let result;
@@ -599,7 +620,13 @@ export default function ControlPanel({ user }: { user: User }) {
           <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
           <NavItem tab="profile" icon={Lock} label="Account Security" />
           {userRole === 'admin' && (
-            <NavItem tab="users" icon={Users} label="User Roles" />
+            <>
+              <div className="pt-4 pb-2 px-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Administration</p>
+              </div>
+              <NavItem tab="users" icon={Users} label="User Roles" />
+              <NavItem tab="access-control" icon={Shield} label="Access Control" />
+            </>
           )}
         </nav>
 
@@ -685,19 +712,19 @@ export default function ControlPanel({ user }: { user: User }) {
                     <span className="w-2 h-2 bg-[#00a651] rounded-full animate-pulse" />
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Notice Management</h3>
                   </div>
-                  <button 
-                    onClick={() => {
-                      if (userRole === 'viewer') return;
-                      setEditingTickerId(null);
-                      setNoticeForm({ content: '', is_active: true, display_duration: 10 });
-                      setShowNoticeForm(true);
-                      setShowBranchForm(false);
-                    }}
-                    disabled={userRole === 'viewer'}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#00a651] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="w-4 h-4" /> Add New Notice
-                  </button>
+                  {hasPermission('notices', 'add') && (
+                    <button 
+                      onClick={() => {
+                        setEditingTickerId(null);
+                        setNoticeForm({ content: '', is_active: true, display_duration: 10, category: 'notice', start_at: null, end_at: null });
+                        setShowNoticeForm(true);
+                        setShowBranchForm(false);
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#00a651] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" /> Add New Notice
+                    </button>
+                  )}
                 </div>
 
                 {showNoticeForm && (
@@ -826,13 +853,17 @@ export default function ControlPanel({ user }: { user: User }) {
                               </td>
                               <td className="py-4 text-right">
                                 <div className="flex justify-end gap-2">
-                                  <button 
-                                    onClick={() => editTickerItem(item)}
-                                    className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
-                                   title="Edit">
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => deleteBranch(item.id!)} className="p-2 text-slate-300 hover:text-red-500 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                  {hasPermission('notices', 'edit') && (
+                                    <button 
+                                      onClick={() => editTickerItem(item)}
+                                      className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                     title="Edit">
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {hasPermission('notices', 'delete') && (
+                                    <button onClick={() => deleteBranch(item.id!)} className="p-2 text-slate-300 hover:text-red-500 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -917,19 +948,19 @@ export default function ControlPanel({ user }: { user: User }) {
                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Branch Management</h3>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => {
-                        if (userRole === 'viewer') return;
-                        setEditingTickerId(null);
-                        setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
-                        setShowBranchForm(true);
-                        setShowNoticeForm(false);
-                      }}
-                      disabled={userRole === 'viewer'}
-                      className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-4 h-4" /> Add New Branch
-                    </button>
+                    {hasPermission('branches', 'add') && (
+                      <button 
+                        onClick={() => {
+                          setEditingTickerId(null);
+                          setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12, start_at: null, end_at: null });
+                          setShowBranchForm(true);
+                          setShowNoticeForm(false);
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#004a99] text-white font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all text-[10px] shadow-sm"
+                      >
+                        <Plus className="w-4 h-4" /> Add New Branch
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1063,12 +1094,12 @@ export default function ControlPanel({ user }: { user: User }) {
                                             {effectivelyActive ? 'Active' : isExpired ? 'Closed' : isUpcoming ? 'Wait' : 'Off'}
                                           </span>
                                           <button 
-                                            onClick={() => userRole !== 'viewer' && toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
-                                            disabled={userRole === 'viewer'}
+                                            onClick={() => hasPermission('branches', 'edit') && toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
+                                            disabled={!hasPermission('branches', 'edit')}
                                             className={cn(
                                               "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
                                               item.is_active && !isExpired ? "bg-[#00a651]" : isExpired ? "bg-red-200" : "bg-slate-200",
-                                              userRole === 'viewer' && "opacity-50 cursor-not-allowed"
+                                              !hasPermission('branches', 'edit') && "opacity-50 cursor-not-allowed"
                                             )}
                                           >
                                             <span
@@ -1088,7 +1119,7 @@ export default function ControlPanel({ user }: { user: User }) {
                               </td>
                               <td className="py-5 text-right text-actions-cell">
                                 <div className="flex justify-end gap-2">
-                                  {userRole !== 'viewer' && (
+                                  {hasPermission('branches', 'edit') && (
                                     <button 
                                       onClick={() => editTickerItem(item)}
                                       className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
@@ -1097,7 +1128,7 @@ export default function ControlPanel({ user }: { user: User }) {
                                       <Edit2 className="w-4 h-4" />
                                     </button>
                                   )}
-                                  {userRole !== 'viewer' && (
+                                  {hasPermission('branches', 'delete') && (
                                     <button 
                                       onClick={() => deleteBranch(item.id!)}
                                       className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -1118,6 +1149,88 @@ export default function ControlPanel({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : activeTab === 'access-control' && userRole === 'admin' ? (
+            <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-12">
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Access Control</h2>
+                <p className="text-slate-500 mt-2">Grant or restrict permissions for Editor and Viewer roles.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8">
+                {['editor', 'viewer'].map(role => (
+                  <div key={role} className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                    <div className="px-8 py-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center font-black text-xs text-blue-600 uppercase">
+                          {role[0]}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">{role} Role</h3>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Permissions Matrix</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-50 text-[10px] uppercase font-bold tracking-widest text-slate-400 bg-slate-50/50">
+                            <th className="px-8 py-4">App Section</th>
+                            <th className="px-8 py-4 text-center">View</th>
+                            <th className="px-8 py-4 text-center">Add</th>
+                            <th className="px-8 py-4 text-center">Edit</th>
+                            <th className="px-8 py-4 text-center">Delete</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                          {['branches', 'notices'].map(section => {
+                            const perm = permissions.find(p => p.role === role && p.section === section);
+                            const togglePerm = async (field: string) => {
+                              if (!perm) {
+                                const { data } = await supabase.from('role_permissions').insert([{
+                                  role, section, [field]: true
+                                }]).select();
+                                if (data) fetchPermissions();
+                              } else {
+                                const { error } = await supabase.from('role_permissions')
+                                  .update({ [field]: !perm[field] })
+                                  .eq('id', perm.id);
+                                if (!error) fetchPermissions();
+                              }
+                            };
+
+                            return (
+                              <tr key={section} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+                                <td className="px-8 py-5">
+                                  <span className="text-slate-900 font-bold uppercase tracking-wide">
+                                    {section === 'branches' ? 'Branch Address' : 'Notice Management'}
+                                  </span>
+                                </td>
+                                {['can_view', 'can_add', 'can_edit', 'can_delete'].map(action => (
+                                  <td key={action} className="px-8 py-5 text-center">
+                                    <button 
+                                      onClick={() => togglePerm(action)}
+                                      className={cn(
+                                        "w-10 h-6 rounded-full relative transition-colors",
+                                        perm?.[action] ? "bg-blue-600" : "bg-slate-200"
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform",
+                                        perm?.[action] ? "translate-x-4" : "translate-x-0"
+                                      )} />
+                                    </button>
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : activeTab === 'profile' ? (
