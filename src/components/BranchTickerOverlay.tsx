@@ -113,8 +113,10 @@ export default function BranchTickerOverlay() {
   const notices = useMemo(() => {
     const items = allItems.filter(i => {
       if (i.type !== 'notice' || !i.is_active) return false;
-      if (i.start_at && new Date(i.start_at) > time) return false;
-      if (i.end_at && new Date(i.end_at) < time) return false;
+      const startAt = i.start_at ? new Date(i.start_at) : null;
+      const endAt = i.end_at ? new Date(i.end_at) : null;
+      if (startAt && startAt > time) return false;
+      if (endAt && endAt < time) return false;
       return true;
     });
 
@@ -122,11 +124,14 @@ export default function BranchTickerOverlay() {
     const announcements = items.filter(i => i.category === 'announcement');
 
     const alternated = [];
-    const max = Math.max(standardNotices.length, announcements.length);
-    
-    for (let i = 0; i < max; i++) {
-      if (standardNotices[i]) alternated.push(standardNotices[i]);
-      if (announcements[i]) alternated.push(announcements[i]);
+    if (standardNotices.length > 0 && announcements.length > 0) {
+      const maxLen = Math.max(standardNotices.length, announcements.length);
+      for (let i = 0; i < maxLen; i++) {
+        alternated.push(standardNotices[i % standardNotices.length]);
+        alternated.push(announcements[i % announcements.length]);
+      }
+    } else {
+      alternated.push(...items);
     }
 
     return alternated;
@@ -135,8 +140,10 @@ export default function BranchTickerOverlay() {
   const branches = useMemo(() => {
     return allItems.filter(i => {
       if ((i.type === 'branch' || i.type === 'branch_address' || !i.type) && i.is_active) {
-        if (i.start_at && new Date(i.start_at) > time) return false;
-        if (i.end_at && new Date(i.end_at) < time) return false;
+        const startAt = i.start_at ? new Date(i.start_at) : null;
+        const endAt = i.end_at ? new Date(i.end_at) : null;
+        if (startAt && startAt > time) return false;
+        if (endAt && endAt < time) return false;
         return true;
       }
       return false;
@@ -227,22 +234,32 @@ export default function BranchTickerOverlay() {
   }, [userId]);
 
   useEffect(() => {
-    if (notices.length <= 1) return;
-    const duration = (notices[noticeIndex]?.display_duration || 10) * 1000;
+    if (notices.length <= 1) {
+      if (noticeIndex !== 0) setNoticeIndex(0);
+      return;
+    }
+    const currentItem = notices[noticeIndex % notices.length];
+    const duration = (currentItem?.display_duration || 10) * 1000;
+    
     const timer = setTimeout(() => {
       setNoticeIndex((prev) => (prev + 1) % notices.length);
     }, duration);
     return () => clearTimeout(timer);
-  }, [notices, noticeIndex]);
+  }, [notices.length, noticeIndex]); // notices.length is more stable than notices array ref
 
   useEffect(() => {
-    if (branches.length <= 1) return;
-    const duration = (branches[branchIndex]?.display_duration || 12) * 1000;
+    if (branches.length <= 1) {
+      if (branchIndex !== 0) setBranchIndex(0);
+      return;
+    }
+    const currentItem = branches[branchIndex % branches.length];
+    const duration = (currentItem?.display_duration || 12) * 1000;
+    
     const timer = setTimeout(() => {
       setBranchIndex((prev) => (prev + 1) % branches.length);
     }, duration);
     return () => clearTimeout(timer);
-  }, [branches, branchIndex]);
+  }, [branches.length, branchIndex]);
 
   // Only show if at least one section is enabled AND there's content for it
   const showNoticeLine = globalSettings.notice_section_enabled && (notices.length > 0);

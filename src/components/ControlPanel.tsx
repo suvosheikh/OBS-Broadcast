@@ -129,40 +129,66 @@ export default function ControlPanel({ user }: { user: User }) {
 
   useEffect(() => {
     const activeNoticesRaw = tickerItems.filter(i => i.type === 'notice' && i.is_active);
-    
-    // Alternation logic for preview
     const standard = activeNoticesRaw.filter(i => i.category !== 'announcement');
     const announcements = activeNoticesRaw.filter(i => i.category === 'announcement');
-    const activeNotices = [];
-    const max = Math.max(standard.length, announcements.length);
-    for (let i = 0; i < max; i++) {
-      if (standard[i]) activeNotices.push(standard[i]);
-      if (announcements[i]) activeNotices.push(announcements[i]);
+    const activeNotices: TickerItem[] = [];
+    
+    if (standard.length > 0 && announcements.length > 0) {
+      const maxLen = Math.max(standard.length, announcements.length);
+      for (let i = 0; i < maxLen; i++) {
+        activeNotices.push(standard[i % standard.length]);
+        activeNotices.push(announcements[i % announcements.length]);
+      }
+    } else {
+      activeNotices.push(...activeNoticesRaw);
     }
 
     const activeBranches = tickerItems.filter(i => i.type === 'branch' && i.is_active);
 
-    const timer = setInterval(() => {
-      if (activeNotices.length > 0) {
-        setCurrentNoticeIndex(prev => (prev + 1) % activeNotices.length);
-      }
-      if (activeBranches.length > 0) {
-        setCurrentBranchIndex(prev => (prev + 1) % activeBranches.length);
-      }
-    }, 6000);
+    let noticeTimer: any;
+    let branchTimer: any;
 
-    return () => clearInterval(timer);
-  }, [tickerItems]);
+    if (activeNotices.length > 1) {
+      const item = activeNotices[currentNoticeIndex % activeNotices.length];
+      const duration = (item?.display_duration || 10) * 1000;
+      noticeTimer = setTimeout(() => {
+        setCurrentNoticeIndex((prev) => (prev + 1) % activeNotices.length);
+      }, duration);
+    } else if (activeNotices.length === 1 && currentNoticeIndex !== 0) {
+      setCurrentNoticeIndex(0);
+    }
+
+    if (activeBranches.length > 1) {
+      const item = activeBranches[currentBranchIndex % activeBranches.length];
+      const duration = (item?.display_duration || 12) * 1000;
+      branchTimer = setTimeout(() => {
+        setCurrentBranchIndex((prev) => (prev + 1) % activeBranches.length);
+      }, duration);
+    } else if (activeBranches.length === 1 && currentBranchIndex !== 0) {
+      setCurrentBranchIndex(0);
+    }
+
+    return () => {
+      if (noticeTimer) clearTimeout(noticeTimer);
+      if (branchTimer) clearTimeout(branchTimer);
+    };
+  }, [tickerItems.length, currentNoticeIndex, currentBranchIndex]); 
+// Use length for stability
 
   const previewNotice = useMemo(() => {
     const raw = tickerItems.filter(i => i.type === 'notice' && i.is_active);
     const standard = raw.filter(i => i.category !== 'announcement');
     const announcements = raw.filter(i => i.category === 'announcement');
     const alternated = [];
-    const max = Math.max(standard.length, announcements.length);
-    for (let i = 0; i < max; i++) {
-      if (standard[i]) alternated.push(standard[i]);
-      if (announcements[i]) alternated.push(announcements[i]);
+    
+    if (standard.length > 0 && announcements.length > 0) {
+      const maxLen = Math.max(standard.length, announcements.length);
+      for (let i = 0; i < maxLen; i++) {
+        alternated.push(standard[i % standard.length]);
+        alternated.push(announcements[i % announcements.length]);
+      }
+    } else {
+      alternated.push(...raw);
     }
     return alternated[currentNoticeIndex % (alternated.length || 1)];
   }, [tickerItems, currentNoticeIndex]);
