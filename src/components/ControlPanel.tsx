@@ -323,8 +323,15 @@ export default function ControlPanel({ user }: { user: User }) {
     if (result?.error) {
       alert(`SQL Error: ${result.error.message}`);
     } else {
-      setNoticeForm({ content: '', is_active: true, display_duration: 10 });
+      setNoticeForm({ 
+        content: '', 
+        is_active: true, 
+        display_duration: 10,
+        start_at: '' as string | null,
+        end_at: '' as string | null
+      });
       setShowNoticeForm(false);
+      await syncMasterSettings();
       fetchBranches();
     }
   }
@@ -367,8 +374,18 @@ export default function ControlPanel({ user }: { user: User }) {
     if (result?.error) {
       alert(`SQL Error: ${result.error.message}`);
     } else {
-      setBranchForm({ name: '', address: '', phone: '', sort_order: 0, is_active: true, display_duration: 12 });
+      setBranchForm({ 
+        name: '', 
+        address: '', 
+        phone: '', 
+        sort_order: 0, 
+        is_active: true, 
+        display_duration: 12,
+        start_at: '' as string | null,
+        end_at: '' as string | null
+      });
       setShowBranchForm(false);
+      await syncMasterSettings();
       fetchBranches();
     }
   }
@@ -414,6 +431,42 @@ export default function ControlPanel({ user }: { user: User }) {
     setDeleteTarget('ticker');
   }
 
+  async function syncMasterSettings() {
+    const { data: items } = await supabase
+      .from('branch_ticker')
+      .select('type, is_active, start_at, end_at')
+      .eq('is_active', true)
+      .limit(2000);
+
+    const now = new Date();
+    const activeNotices = items?.filter(i => {
+      if (i.type !== 'notice') return false;
+      if (i.start_at && new Date(i.start_at) > now) return false;
+      if (i.end_at && new Date(i.end_at) < now) return false;
+      return true;
+    }).length || 0;
+
+    const activeBranches = items?.filter(i => {
+      if (i.type === 'notice') return false;
+      if (i.start_at && new Date(i.start_at) > now) return false;
+      if (i.end_at && new Date(i.end_at) < now) return false;
+      return true;
+    }).length || 0;
+
+    const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle();
+    if (settings) {
+      let updates: any = {};
+      if (activeNotices === 0 && settings.notice_section_enabled) updates.notice_section_enabled = false;
+      if (activeBranches === 0 && settings.branch_section_enabled) updates.branch_section_enabled = false;
+      if (activeNotices > 0 && !settings.notice_section_enabled) updates.notice_section_enabled = true;
+      if (activeBranches > 0 && !settings.branch_section_enabled) updates.branch_section_enabled = true;
+      
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('settings').update(updates).eq('id', settings.id);
+      }
+    }
+  }
+
   async function executeDelete() {
     if (!deleteConfirmId || !deleteTarget) return;
 
@@ -444,27 +497,8 @@ export default function ControlPanel({ user }: { user: User }) {
     // 1. Update the item
     await supabase.from('branch_ticker').update({ is_active: !current }).eq('id', id);
     
-    // 2. Fetch fresh active counts
-    const { data: items } = await supabase
-      .from('branch_ticker')
-      .select('type, is_active')
-      .eq('is_active', true)
-      .limit(2000);
-
-    const activeNotices = items?.filter(i => i.type === 'notice').length || 0;
-    const activeBranches = items?.filter(i => i.type !== 'notice').length || 0;
-
-    // 3. Sync master settings
-    const { data: settings } = await supabase.from('settings').select('*').limit(1).maybeSingle();
-    if (settings) {
-      let updates: any = {};
-      if (activeNotices === 0 && settings.notice_section_enabled) updates.notice_section_enabled = false;
-      if (activeBranches === 0 && settings.branch_section_enabled) updates.branch_section_enabled = false;
-      
-      if (Object.keys(updates).length > 0) {
-        await supabase.from('settings').update(updates).eq('id', settings.id);
-      }
-    }
+    // 2. Sync master settings
+    await syncMasterSettings();
 
     fetchBranches();
   }

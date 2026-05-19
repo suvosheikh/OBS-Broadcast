@@ -50,23 +50,39 @@ export function SettingsWizard({ isOpen, onClose }: { isOpen: boolean; onClose: 
       // 2. Fetch active counts for ALL items (shared)
       const { data: items } = await supabase
         .from('branch_ticker')
-        .select('type, is_active')
+        .select('type, is_active, start_at, end_at')
         .eq('is_active', true)
         .limit(2000);
 
+      const now = new Date();
       const counts = {
-        notices: items?.filter(i => i.type === 'notice').length || 0,
-        branches: items?.filter(i => i.type !== 'notice').length || 0
+        notices: items?.filter(i => {
+          if (i.type !== 'notice') return false;
+          if (i.start_at && new Date(i.start_at) > now) return false;
+          if (i.end_at && new Date(i.end_at) < now) return false;
+          return true;
+        }).length || 0,
+        branches: items?.filter(i => {
+          if (i.type === 'notice') return false;
+          if (i.start_at && new Date(i.start_at) > now) return false;
+          if (i.end_at && new Date(i.end_at) < now) return false;
+          return true;
+        }).length || 0
       };
       
       setActiveCounts(counts);
 
-      // 3. Auto-sync logic: If 0 items, master MUST be false in DB
+      // 3. Auto-sync logic: 
+      // - If 0 items, master MUST be false in DB
+      // - If > 0 items and master is false, auto-enable as requested by user
       let updatedNotice = data.notice_section_enabled;
       let updatedBranch = data.branch_section_enabled;
 
       if (counts.notices === 0 && data.notice_section_enabled) updatedNotice = false;
+      if (counts.notices > 0 && !data.notice_section_enabled) updatedNotice = true;
+      
       if (counts.branches === 0 && data.branch_section_enabled) updatedBranch = false;
+      if (counts.branches > 0 && !data.branch_section_enabled) updatedBranch = true;
 
       if (updatedNotice !== data.notice_section_enabled || updatedBranch !== data.branch_section_enabled) {
         await supabase
