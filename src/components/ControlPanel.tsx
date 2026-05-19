@@ -7,7 +7,6 @@ import {
   Trash2, 
   Eye, 
   EyeOff,
-  Settings, 
   LogOut, 
   ExternalLink,
   Save,
@@ -24,9 +23,13 @@ import {
   Clock,
   Package,
   Users,
+  CircleUser as UserIcon,
   Trophy,
   Image as ImageIcon,
   MapPin,
+  Settings as SettingsIcon,
+  Lock,
+  AlertCircle,
   Phone,
   Square,
   Sliders,
@@ -78,13 +81,18 @@ interface TickerItem {
   sort_order?: number;
   display_duration?: number;
   is_active: boolean;
+  start_at?: string | null;
+  end_at?: string | null;
 }
 
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner' | 'branch-address' | 'users'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'overlay-input' | 'overlay-image' | 'overlay-winner' | 'branch-address' | 'users' | 'profile'>('dashboard');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer'>('viewer');
   const [usersBoard, setUsersBoard] = useState<any[]>([]);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [winners, setWinners] = useState<WinnerData[]>([]);
   const [winnerForm, setWinnerForm] = useState<WinnerData>({
@@ -97,7 +105,9 @@ export default function ControlPanel({ user }: { user: User }) {
   const [noticeForm, setNoticeForm] = useState({
     content: '',
     is_active: true,
-    display_duration: 10
+    display_duration: 10,
+    start_at: '' as string | null,
+    end_at: '' as string | null
   });
   const [branchForm, setBranchForm] = useState({
     name: '',
@@ -105,7 +115,9 @@ export default function ControlPanel({ user }: { user: User }) {
     phone: '',
     sort_order: 0,
     is_active: true,
-    display_duration: 12
+    display_duration: 12,
+    start_at: '' as string | null,
+    end_at: '' as string | null
   });
   const [showNoticeForm, setShowNoticeForm] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
@@ -287,7 +299,9 @@ export default function ControlPanel({ user }: { user: User }) {
       result = await supabase.from('branch_ticker').update({
         top_message: noticeForm.content,
         is_active: noticeForm.is_active,
-        display_duration: noticeForm.display_duration
+        display_duration: noticeForm.display_duration,
+        start_at: noticeForm.start_at ? new Date(noticeForm.start_at).toISOString() : null,
+        end_at: noticeForm.end_at ? new Date(noticeForm.end_at).toISOString() : null
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
@@ -300,7 +314,9 @@ export default function ControlPanel({ user }: { user: User }) {
           bottom_message: '',
           is_active: noticeForm.is_active,
           display_duration: noticeForm.display_duration,
-          user_id: user.id 
+          user_id: user.id,
+          start_at: noticeForm.start_at ? new Date(noticeForm.start_at).toISOString() : null,
+          end_at: noticeForm.end_at ? new Date(noticeForm.end_at).toISOString() : null
         }]);
     }
 
@@ -325,7 +341,9 @@ export default function ControlPanel({ user }: { user: User }) {
         phone_number: branchForm.phone,
         sort_order: branchForm.sort_order,
         is_active: branchForm.is_active,
-        display_duration: branchForm.display_duration
+        display_duration: branchForm.display_duration,
+        start_at: branchForm.start_at ? new Date(branchForm.start_at).toISOString() : null,
+        end_at: branchForm.end_at ? new Date(branchForm.end_at).toISOString() : null
       }).eq('id', editingTickerId);
       setEditingTickerId(null);
     } else {
@@ -340,7 +358,9 @@ export default function ControlPanel({ user }: { user: User }) {
           top_message: '',
           is_active: branchForm.is_active,
           display_duration: branchForm.display_duration,
-          user_id: user.id 
+          user_id: user.id,
+          start_at: branchForm.start_at ? new Date(branchForm.start_at).toISOString() : null,
+          end_at: branchForm.end_at ? new Date(branchForm.end_at).toISOString() : null
         }]);
     }
     
@@ -353,13 +373,22 @@ export default function ControlPanel({ user }: { user: User }) {
     }
   }
 
+  const toLocalISO = (iso?: string | null) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  };
+
   function editTickerItem(item: TickerItem) {
     setEditingTickerId(item.id!);
     if (item.type === 'notice') {
       setNoticeForm({
         content: item.top_message,
         is_active: item.is_active,
-        display_duration: item.display_duration || 10
+        display_duration: item.display_duration || 10,
+        start_at: toLocalISO(item.start_at),
+        end_at: toLocalISO(item.end_at)
       });
       setShowNoticeForm(true);
       setShowBranchForm(false);
@@ -370,7 +399,9 @@ export default function ControlPanel({ user }: { user: User }) {
         phone: item.phone_number || '',
         sort_order: item.sort_order || 0,
         is_active: item.is_active,
-        display_duration: item.display_duration || 12
+        display_duration: item.display_duration || 12,
+        start_at: toLocalISO(item.start_at),
+        end_at: toLocalISO(item.end_at)
       });
       setShowBranchForm(true);
       setShowNoticeForm(false);
@@ -703,6 +734,7 @@ export default function ControlPanel({ user }: { user: User }) {
           )}
           <NavItem tab="overlay-winner" icon={Trophy} label="Overlay Winner" />
           <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
+          <NavItem tab="profile" icon={Lock} label="Account Security" />
           {userRole === 'admin' && (
             <NavItem tab="users" icon={Users} label="User Roles" />
           )}
@@ -1176,6 +1208,20 @@ export default function ControlPanel({ user }: { user: User }) {
                         onChange={v => setNoticeForm({...noticeForm, display_duration: parseInt(v) || 10})} 
                       />
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormInput 
+                        label="Start Date & Time (Optional)" 
+                        type="datetime-local"
+                        value={noticeForm.start_at || ''} 
+                        onChange={v => setNoticeForm({...noticeForm, start_at: v})} 
+                      />
+                      <FormInput 
+                        label="End Date & Time (Optional)" 
+                        type="datetime-local"
+                        value={noticeForm.end_at || ''} 
+                        onChange={v => setNoticeForm({...noticeForm, end_at: v})} 
+                      />
+                    </div>
                     <div className="flex gap-4">
                       <button 
                         onClick={saveNotice}
@@ -1201,14 +1247,42 @@ export default function ControlPanel({ user }: { user: User }) {
                         <tbody className="divide-y divide-slate-50">
                           {tickerItems.filter(i => i.type === 'notice').map(item => (
                             <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
-                              <td className="py-4 font-medium text-xs text-slate-800">{item.top_message}</td>
+                              <td className="py-4 font-medium text-xs text-slate-800">
+                                <div>{item.top_message}</div>
+                                {(item.start_at || item.end_at) && (
+                                  <div className="flex items-center gap-2 mt-1 text-[9px] font-bold text-slate-400 border border-slate-100 w-fit px-1.5 py-0.5 rounded-md bg-slate-50 uppercase tracking-tighter">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {item.start_at ? new Date(item.start_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '∞'} 
+                                    <span>→</span>
+                                    {item.end_at ? new Date(item.end_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '∞'}
+                                  </div>
+                                )}
+                              </td>
                               <td className="py-4 text-center">
-                                <button 
-                                  onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'notice')}
-                                  className={cn("p-2 rounded-lg border transition-all", item.is_active ? "bg-green-50 text-green-600 border-green-100" : "bg-slate-50 text-slate-400 border-slate-100")}
-                                >
-                                  {item.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                </button>
+                                {(() => {
+                                  const isExpired = item.end_at && new Date(item.end_at) < currentTime;
+                                  const isUpcoming = item.start_at && new Date(item.start_at) > currentTime;
+                                  const effectivelyActive = item.is_active && !isExpired && !isUpcoming;
+
+                                  return (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <button 
+                                        onClick={() => toggleTickerItemStatus(item.id!, item.is_active, 'notice')}
+                                        className={cn(
+                                          "p-2 rounded-lg border transition-all", 
+                                          effectivelyActive ? "bg-green-50 text-green-600 border-green-100" : 
+                                          isExpired ? "bg-red-50 text-red-400 border-red-100 opacity-50" :
+                                          isUpcoming ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                          "bg-slate-50 text-slate-400 border-slate-100"
+                                        )}
+                                      >
+                                        {item.is_active && !isExpired ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                      </button>
+                                      {isExpired && <span className="text-[7px] font-black text-red-500 uppercase tracking-tighter">Expired</span>}
+                                      {isUpcoming && <span className="text-[7px] font-black text-blue-500 uppercase tracking-tighter">Upcoming</span>}
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td className="py-4 text-right">
                                 <div className="flex justify-end gap-2">
@@ -1366,6 +1440,21 @@ export default function ControlPanel({ user }: { user: User }) {
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormInput 
+                        label="Start Date & Time (Optional)" 
+                        type="datetime-local"
+                        value={branchForm.start_at || ''} 
+                        onChange={v => setBranchForm({...branchForm, start_at: v})} 
+                      />
+                      <FormInput 
+                        label="End Date & Time (Optional)" 
+                        type="datetime-local"
+                        value={branchForm.end_at || ''} 
+                        onChange={v => setBranchForm({...branchForm, end_at: v})} 
+                      />
+                    </div>
+
                     <div className="flex gap-4">
                       <button 
                         onClick={saveBranchAddress}
@@ -1395,7 +1484,17 @@ export default function ControlPanel({ user }: { user: User }) {
                           {tickerItems.filter(i => i.type === 'branch').map(item => (
                             <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
                               <td className="py-5 text-center font-mono text-[10px] bg-slate-50/30 rounded-lg">{item.sort_order || 0}</td>
-                              <td className="py-5 pl-4 font-bold text-xs text-slate-900">{item.branch_name}</td>
+                              <td className="py-5 pl-4 text-xs text-slate-900">
+                                <div className="font-bold">{item.branch_name}</div>
+                                {(item.start_at || item.end_at) && (
+                                  <div className="flex items-center gap-1 mt-1 text-[8px] font-black text-slate-400 uppercase tracking-tighter opacity-60">
+                                    <Clock className="w-2 h-2" />
+                                    {item.start_at ? new Date(item.start_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '∞'} 
+                                    <span>→</span>
+                                    {item.end_at ? new Date(item.end_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '∞'}
+                                  </div>
+                                )}
+                              </td>
                               <td className="py-5 text-xs text-slate-500 font-medium">
                                 {item.phone_number || '---'}
                               </td>
@@ -1404,28 +1503,45 @@ export default function ControlPanel({ user }: { user: User }) {
                               </td>
                               <td className="py-5 text-center">
                                 <div className="flex items-center justify-center gap-3">
-                                  <span className={cn(
-                                    "text-[10px] font-bold uppercase tracking-tighter w-12 text-right",
-                                    item.is_active ? "text-green-600" : "text-slate-400"
-                                  )}>
-                                    {item.is_active ? 'Active' : 'Inactive'}
-                                  </span>
-                                  <button 
-                                    onClick={() => userRole !== 'viewer' && toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
-                                    disabled={userRole === 'viewer'}
-                                    className={cn(
-                                      "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                                      item.is_active ? "bg-[#00a651]" : "bg-slate-200",
-                                      userRole === 'viewer' && "opacity-50 cursor-not-allowed"
-                                    )}
-                                  >
-                                    <span
-                                      className={cn(
-                                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                                        item.is_active ? "translate-x-5" : "translate-x-0"
-                                      )}
-                                    />
-                                  </button>
+                                  {(() => {
+                                    const isExpired = item.end_at && new Date(item.end_at) < currentTime;
+                                    const isUpcoming = item.start_at && new Date(item.start_at) > currentTime;
+                                    const effectivelyActive = item.is_active && !isExpired && !isUpcoming;
+
+                                    return (
+                                      <div className="flex flex-col items-center gap-1">
+                                        <div className="flex items-center gap-3">
+                                          <span className={cn(
+                                            "text-[10px] font-bold uppercase tracking-tighter w-12 text-right",
+                                            effectivelyActive ? "text-green-600" : 
+                                            isExpired ? "text-red-500" :
+                                            isUpcoming ? "text-blue-500" :
+                                            "text-slate-400"
+                                          )}>
+                                            {effectivelyActive ? 'Active' : isExpired ? 'Closed' : isUpcoming ? 'Wait' : 'Off'}
+                                          </span>
+                                          <button 
+                                            onClick={() => userRole !== 'viewer' && toggleTickerItemStatus(item.id!, item.is_active, 'branch')}
+                                            disabled={userRole === 'viewer'}
+                                            className={cn(
+                                              "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                              item.is_active && !isExpired ? "bg-[#00a651]" : isExpired ? "bg-red-200" : "bg-slate-200",
+                                              userRole === 'viewer' && "opacity-50 cursor-not-allowed"
+                                            )}
+                                          >
+                                            <span
+                                              className={cn(
+                                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                                item.is_active && !isExpired ? "translate-x-5" : "translate-x-0"
+                                              )}
+                                            />
+                                          </button>
+                                        </div>
+                                        {isExpired && <span className="text-[7px] font-black text-red-500 uppercase tracking-tighter">Schedule Ended</span>}
+                                        {isUpcoming && <span className="text-[7px] font-black text-blue-500 uppercase tracking-tighter">Starting Soon</span>}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </td>
                               <td className="py-5 text-right text-actions-cell">
@@ -1460,6 +1576,89 @@ export default function ControlPanel({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : activeTab === 'profile' ? (
+            <div className="p-8 lg:p-12 max-w-2xl mx-auto space-y-8">
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Account Security</h2>
+                <p className="text-slate-500 mt-2">Manage your login credentials and password.</p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8 space-y-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-400">
+                      <UserIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Email Address</p>
+                      <p className="text-sm font-bold text-slate-700">{user.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">New Password</label>
+                    <input 
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password (min 6 chars)"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Confirm New Password</label>
+                    <input 
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={async () => {
+                    if (newPassword.length < 6) {
+                      alert("Password must be at least 6 characters.");
+                      return;
+                    }
+                    if (newPassword !== confirmPassword) {
+                      alert("Passwords do not match!");
+                      return;
+                    }
+                    
+                    setIsUpdatingPassword(true);
+                    const { error } = await supabase.auth.updateUser({ password: newPassword });
+                    setIsUpdatingPassword(false);
+                    
+                    if (error) {
+                      alert("Error: " + error.message);
+                    } else {
+                      alert("Password updated successfully!");
+                      setNewPassword('');
+                      setConfirmPassword('');
+                    }
+                  }}
+                  disabled={isUpdatingPassword || !newPassword || !confirmPassword}
+                  className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-30 text-[10px] flex items-center justify-center gap-3 shadow-xl"
+                >
+                  {isUpdatingPassword ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  Update Password
+                </button>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl flex items-start gap-4">
+                 <div className="p-2 bg-amber-100 rounded-lg">
+                   <AlertCircle className="w-5 h-5 text-amber-600" />
+                 </div>
+                 <div>
+                    <h4 className="text-sm font-bold text-amber-900">Security Recommendation</h4>
+                    <p className="text-xs text-amber-700 mt-1">Use a strong password with at least 8 characters, including symbols and numbers. Never shared your credentials with anyone.</p>
+                 </div>
               </div>
             </div>
           ) : activeTab === 'users' && userRole === 'admin' ? (
@@ -1518,7 +1717,7 @@ export default function ControlPanel({ user }: { user: User }) {
               
               <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl flex items-start gap-4">
                  <div className="p-2 bg-blue-100 rounded-lg">
-                   <Settings className="w-5 h-5 text-blue-600" />
+                   <SettingsIcon className="w-5 h-5 text-blue-600" />
                  </div>
                  <div>
                     <h4 className="text-sm font-bold text-blue-900">Permissions Logic</h4>

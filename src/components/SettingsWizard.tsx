@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, X, Power, Bell, MapPin } from 'lucide-react';
+import { Settings as SettingsIcon, X, Power, Bell, MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface GlobalSettings {
@@ -125,7 +125,7 @@ export function SettingsWizard({ isOpen, onClose }: { isOpen: boolean; onClose: 
           <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200">
             <div className="flex items-center gap-3">
               <div className="bg-[#004a99] p-2 rounded-lg">
-                <Settings className="w-5 h-5 text-white" />
+                <SettingsIcon className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-800 text-lg">Control Panel</h3>

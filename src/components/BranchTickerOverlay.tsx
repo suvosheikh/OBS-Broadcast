@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,6 +13,9 @@ interface TickerItem {
   phone_number?: string;
   sort_order?: number;
   display_duration?: number;
+  is_active?: boolean;
+  start_at?: string | null;
+  end_at?: string | null;
 }
 
 const TypewritingText = ({ text, speed = 30, delay = 0, onComplete }: { text: string; speed?: number; delay?: number; onComplete?: () => void }) => {
@@ -96,8 +99,7 @@ const Marquee = ({ children, isVisible, textLength, id }: { children: React.Reac
 
 export default function BranchTickerOverlay() {
   const { userId } = useParams<{ userId: string }>();
-  const [notices, setNotices] = useState<TickerItem[]>([]);
-  const [branches, setBranches] = useState<TickerItem[]>([]);
+  const [allItems, setAllItems] = useState<TickerItem[]>([]);
   const [noticeIndex, setNoticeIndex] = useState(0);
   const [branchIndex, setBranchIndex] = useState(0);
   const [time, setTime] = useState(new Date());
@@ -105,6 +107,26 @@ export default function BranchTickerOverlay() {
     notice_section_enabled: true,
     branch_section_enabled: true
   });
+
+  const notices = useMemo(() => {
+    return allItems.filter(i => {
+      if (i.type !== 'notice' || !i.is_active) return false;
+      if (i.start_at && new Date(i.start_at) > time) return false;
+      if (i.end_at && new Date(i.end_at) < time) return false;
+      return true;
+    });
+  }, [allItems, time]);
+
+  const branches = useMemo(() => {
+    return allItems.filter(i => {
+      if ((i.type === 'branch' || i.type === 'branch_address' || !i.type) && i.is_active) {
+        if (i.start_at && new Date(i.start_at) > time) return false;
+        if (i.end_at && new Date(i.end_at) < time) return false;
+        return true;
+      }
+      return false;
+    });
+  }, [allItems, time]);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -135,13 +157,7 @@ export default function BranchTickerOverlay() {
         return;
       }
       
-      const allItems = (data || []) as TickerItem[];
-      console.log("Overlay fetched items count:", allItems.length);
-      const activeNotices = allItems.filter(i => i.type === 'notice' && i.is_active);
-      const activeBranches = allItems.filter(i => (i.type === 'branch' || i.type === 'branch_address' || !i.type) && i.is_active);
-      
-      setNotices(activeNotices);
-      setBranches(activeBranches);
+      setAllItems((data || []) as TickerItem[]);
     }
 
     fetchSettings();
