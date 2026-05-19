@@ -1261,7 +1261,8 @@ export default function ControlPanel({ user }: { user: User }) {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password (min 6 chars)"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                      disabled={userRole === 'viewer'}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all disabled:opacity-50"
                     />
                   </div>
 
@@ -1272,13 +1273,15 @@ export default function ControlPanel({ user }: { user: User }) {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Repeat new password"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                      disabled={userRole === 'viewer'}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all disabled:opacity-50"
                     />
                   </div>
                 </div>
 
                 <button 
                   onClick={async () => {
+                    if (userRole === 'viewer') return;
                     if (newPassword.length < 6) {
                       alert("Password must be at least 6 characters.");
                       return;
@@ -1300,8 +1303,8 @@ export default function ControlPanel({ user }: { user: User }) {
                       setConfirmPassword('');
                     }
                   }}
-                  disabled={isUpdatingPassword || !newPassword || !confirmPassword}
-                  className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-30 text-[10px] flex items-center justify-center gap-3 shadow-xl"
+                  disabled={isUpdatingPassword || !newPassword || !confirmPassword || userRole === 'viewer'}
+                  className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[10px] flex items-center justify-center gap-3 shadow-xl"
                 >
                   {isUpdatingPassword ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                   Update Password
