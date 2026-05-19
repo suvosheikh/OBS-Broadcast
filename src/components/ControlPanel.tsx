@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
@@ -66,6 +66,7 @@ interface WinnerData {
 interface TickerItem {
   id?: string;
   type: 'notice' | 'branch' | 'branch_address' | string;
+  category?: 'notice' | 'announcement';
   top_message: string;
   bottom_message: string;
   branch_name: string;
@@ -78,7 +79,7 @@ interface TickerItem {
 }
 
 export default function ControlPanel({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'branch-address' | 'users' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'branch-address' | 'users' | 'profile'>('branch-address');
   const [stats, setStats] = useState({ today: 0, total: 0 });
   const [userRole, setUserRole] = useState<'admin' | 'editor' | 'viewer'>('viewer');
   const [usersBoard, setUsersBoard] = useState<any[]>([]);
@@ -89,6 +90,7 @@ export default function ControlPanel({ user }: { user: User }) {
   const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
   const [noticeForm, setNoticeForm] = useState({
     content: '',
+    category: 'notice' as 'notice' | 'announcement',
     is_active: true,
     display_duration: 10,
     start_at: '' as string | null,
@@ -126,7 +128,18 @@ export default function ControlPanel({ user }: { user: User }) {
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
 
   useEffect(() => {
-    const activeNotices = tickerItems.filter(i => i.type === 'notice' && i.is_active);
+    const activeNoticesRaw = tickerItems.filter(i => i.type === 'notice' && i.is_active);
+    
+    // Alternation logic for preview
+    const standard = activeNoticesRaw.filter(i => i.category !== 'announcement');
+    const announcements = activeNoticesRaw.filter(i => i.category === 'announcement');
+    const activeNotices = [];
+    const max = Math.max(standard.length, announcements.length);
+    for (let i = 0; i < max; i++) {
+      if (standard[i]) activeNotices.push(standard[i]);
+      if (announcements[i]) activeNotices.push(announcements[i]);
+    }
+
     const activeBranches = tickerItems.filter(i => i.type === 'branch' && i.is_active);
 
     const timer = setInterval(() => {
@@ -141,7 +154,19 @@ export default function ControlPanel({ user }: { user: User }) {
     return () => clearInterval(timer);
   }, [tickerItems]);
 
-  const previewNotice = tickerItems.filter(i => i.type === 'notice' && i.is_active)[currentNoticeIndex];
+  const previewNotice = useMemo(() => {
+    const raw = tickerItems.filter(i => i.type === 'notice' && i.is_active);
+    const standard = raw.filter(i => i.category !== 'announcement');
+    const announcements = raw.filter(i => i.category === 'announcement');
+    const alternated = [];
+    const max = Math.max(standard.length, announcements.length);
+    for (let i = 0; i < max; i++) {
+      if (standard[i]) alternated.push(standard[i]);
+      if (announcements[i]) alternated.push(announcements[i]);
+    }
+    return alternated[currentNoticeIndex % (alternated.length || 1)];
+  }, [tickerItems, currentNoticeIndex]);
+
   const previewBranch = tickerItems.filter(i => i.type === 'branch' && i.is_active)[currentBranchIndex];
 
   useEffect(() => {
@@ -263,6 +288,7 @@ export default function ControlPanel({ user }: { user: User }) {
     if (editingTickerId) {
       result = await supabase.from('branch_ticker').update({
         top_message: noticeForm.content,
+        category: noticeForm.category,
         is_active: noticeForm.is_active,
         display_duration: noticeForm.display_duration,
         start_at: noticeForm.start_at ? new Date(noticeForm.start_at).toISOString() : null,
@@ -274,6 +300,7 @@ export default function ControlPanel({ user }: { user: User }) {
         .from('branch_ticker')
         .insert([{ 
           type: 'notice',
+          category: noticeForm.category,
           top_message: noticeForm.content,
           branch_name: '',
           bottom_message: '',
@@ -290,6 +317,7 @@ export default function ControlPanel({ user }: { user: User }) {
     } else {
       setNoticeForm({ 
         content: '', 
+        category: 'notice',
         is_active: true, 
         display_duration: 10,
         start_at: '' as string | null,
@@ -367,6 +395,7 @@ export default function ControlPanel({ user }: { user: User }) {
     if (item.type === 'notice') {
       setNoticeForm({
         content: item.top_message,
+        category: item.category || 'notice',
         is_active: item.is_active,
         display_duration: item.display_duration || 10,
         start_at: toLocalISO(item.start_at),
@@ -542,7 +571,6 @@ export default function ControlPanel({ user }: { user: User }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
-          <NavItem tab="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem tab="branch-address" icon={MapPin} label="Branch Address" />
           <NavItem tab="profile" icon={Lock} label="Account Security" />
           {userRole === 'admin' && (
@@ -607,65 +635,7 @@ export default function ControlPanel({ user }: { user: User }) {
           </div>
         </header>
 
-        {activeTab === 'dashboard' ? (
-          <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-12">
-            {/* Dashboard Content ... */}
-            <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">System Performance</h2>
-              <p className="text-slate-500 mt-2">Real-time telemetry and data metrics from your broadcast station.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between group hover:border-blue-200 transition-colors">
-                <div className="space-y-1">
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Events Dispatched Today</p>
-                  <p className="text-5xl font-extrabold text-slate-900">{stats.today.toString().padStart(2, '0')}</p>
-                </div>
-                <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Zap className="w-7 h-7" />
-                </div>
-              </div>
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between group hover:border-slate-300 transition-colors">
-                <div className="space-y-1">
-                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Lifetime Transmissions</p>
-                  <p className="text-5xl font-extrabold text-slate-900">{stats.total.toString().padStart(2, '0')}</p>
-                </div>
-                <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Package className="w-7 h-7" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900">Recent Transmissions</h3>
-                <Clock className="w-4 h-4 text-slate-300" />
-              </div>
-              <div className="divide-y divide-slate-50">
-                {history.length === 0 ? (
-                  <div className="p-16 text-center text-slate-300 italic text-sm">No transmissions detected yet</div>
-                ) : (
-                  history.map((item) => (
-                    <div key={item.id} className="px-8 py-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-slate-50 transition-colors">
-                      <div className="flex gap-4 items-center">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                          <Send className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{item.content.product_name}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.content.sku} • {item.content.price} BDT</p>
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-400 bg-slate-50 px-3 py-1 rounded-lg self-start sm:self-center">
-                        {new Date(item.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        ) : activeTab === 'branch-address' ? (
+        {activeTab === 'branch-address' ? (
           <div className="p-8 lg:p-12 max-w-6xl mx-auto flex flex-col gap-12">
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6">
               <div>
@@ -716,16 +686,27 @@ export default function ControlPanel({ user }: { user: User }) {
                       <button onClick={() => setShowNoticeForm(false)} className="text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <FormInput 
-                          label="Notice Text" 
+                          label="Notice Content" 
                           placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
                           value={noticeForm.content} 
                           onChange={v => setNoticeForm({...noticeForm, content: v})} 
                         />
                       </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Category</label>
+                        <select 
+                          value={noticeForm.category}
+                          onChange={e => setNoticeForm({...noticeForm, category: e.target.value as any})}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
+                        >
+                          <option value="notice">নোটিশ (Notice)</option>
+                          <option value="announcement">ঘোষণা (Announcement)</option>
+                        </select>
+                      </div>
                       <FormInput 
-                        label="Display Time (Seconds)" 
+                        label="Duration (Sec)" 
                         type="number"
                         value={noticeForm.display_duration.toString()} 
                         onChange={v => setNoticeForm({...noticeForm, display_duration: parseInt(v) || 10})} 
@@ -762,6 +743,7 @@ export default function ControlPanel({ user }: { user: User }) {
                       <table className="w-full text-left border-separate border-spacing-0">
                         <thead>
                           <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                             <th className="pb-4 pt-2 font-bold">Category</th>
                              <th className="pb-4 pt-2 font-bold">Notice Content</th>
                              <th className="pb-4 pt-2 font-bold text-center">Status</th>
                              <th className="pb-4 pt-2 font-bold text-right">Actions</th>
@@ -770,6 +752,16 @@ export default function ControlPanel({ user }: { user: User }) {
                         <tbody className="divide-y divide-slate-50">
                           {tickerItems.filter(i => i.type === 'notice').map(item => (
                             <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors">
+                              <td className="py-4">
+                                <span className={cn(
+                                  "text-[8px] font-black uppercase px-2 py-1 rounded-md border tracking-tighter",
+                                  item.category === 'announcement' 
+                                    ? "bg-amber-50 text-amber-600 border-amber-100" 
+                                    : "bg-green-50 text-green-600 border-green-100"
+                                )}>
+                                  {item.category === 'announcement' ? 'ঘোষণা' : 'নোটিশ'}
+                                </span>
+                              </td>
                               <td className="py-4 font-medium text-xs text-slate-800">
                                 <div>{item.top_message}</div>
                                 {(item.start_at || item.end_at) && (
@@ -847,8 +839,10 @@ export default function ControlPanel({ user }: { user: User }) {
                   <div className="flex-1 w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/5 p-1 min-h-[80px] flex items-center justify-center">
                     <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none origin-center">
                        <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
-                          <div className="w-[80px] bg-[#004a99] h-full flex items-center justify-center">
-                             <span className="text-white font-black text-xs italic font-bangla">নোটিশ</span>
+                          <div className="w-[80px] h-full bg-[#004a99] flex items-center justify-center">
+                             <span className="text-white font-black text-xs italic font-bangla">
+                               {(previewNotice?.category === 'announcement' || noticeForm.category === 'announcement') ? 'ঘোষণা' : 'নোটিশ'}
+                             </span>
                           </div>
                           <div className="flex-1 px-4 text-white text-xs font-bold truncate font-bangla">
                              {previewNotice?.top_message || noticeForm.content || '...'}

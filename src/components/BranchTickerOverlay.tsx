@@ -3,10 +3,12 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Square } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface TickerItem {
   id: string;
   type: 'notice' | 'branch' | 'branch_address' | string;
+  category?: 'notice' | 'announcement';
   top_message: string;
   bottom_message: string;
   branch_name: string;
@@ -109,12 +111,25 @@ export default function BranchTickerOverlay() {
   });
 
   const notices = useMemo(() => {
-    return allItems.filter(i => {
+    const items = allItems.filter(i => {
       if (i.type !== 'notice' || !i.is_active) return false;
       if (i.start_at && new Date(i.start_at) > time) return false;
       if (i.end_at && new Date(i.end_at) < time) return false;
       return true;
     });
+
+    const standardNotices = items.filter(i => i.category !== 'announcement');
+    const announcements = items.filter(i => i.category === 'announcement');
+
+    const alternated = [];
+    const max = Math.max(standardNotices.length, announcements.length);
+    
+    for (let i = 0; i < max; i++) {
+      if (standardNotices[i]) alternated.push(standardNotices[i]);
+      if (announcements[i]) alternated.push(announcements[i]);
+    }
+
+    return alternated;
   }, [allItems, time]);
 
   const branches = useMemo(() => {
@@ -259,17 +274,17 @@ export default function BranchTickerOverlay() {
               <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20 relative overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div 
-                    key="notice-header-text"
+                    key={currentNotice?.category || 'notice'}
                     initial={{ x: '-100%', opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: '-100%', opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    exit={{ x: '100%', opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
                     className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.2] font-bangla w-full h-full flex items-center justify-center break-words"
                     style={{ 
                       fontSize: 'clamp(22px, 2.6vw, 34px)'
                     }}
                   >
-                    নোটিশ
+                    {currentNotice?.category === 'announcement' ? 'ঘোষণা' : 'নোটিশ'}
                   </motion.div>
                 </AnimatePresence>
               </div>
