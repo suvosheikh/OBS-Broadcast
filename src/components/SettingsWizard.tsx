@@ -51,7 +51,8 @@ export function SettingsWizard({ isOpen, onClose }: { isOpen: boolean; onClose: 
       const { data: items } = await supabase
         .from('branch_ticker')
         .select('type, is_active')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .limit(2000);
 
       const counts = {
         notices: items?.filter(i => i.type === 'notice').length || 0,

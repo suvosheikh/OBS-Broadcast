@@ -267,11 +267,13 @@ export default function ControlPanel({ user }: { user: User }) {
       .from('branch_ticker')
       .select('*')
       .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(2000);
     
     if (error) {
       console.error("Error fetching branch ticker:", error);
     } else {
+      console.log("Fetched branches:", data?.length);
       setTickerItems(data || []);
     }
   }
@@ -415,7 +417,8 @@ export default function ControlPanel({ user }: { user: User }) {
     const { data: items } = await supabase
       .from('branch_ticker')
       .select('type, is_active')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .limit(2000);
 
     const activeNotices = items?.filter(i => i.type === 'notice').length || 0;
     const activeBranches = items?.filter(i => i.type !== 'notice').length || 0;

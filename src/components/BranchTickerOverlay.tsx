@@ -127,7 +127,8 @@ export default function BranchTickerOverlay() {
         .from('branch_ticker')
         .select('*')
         .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(2000);
 
       if (error) {
         console.error("Error fetching branch ticker items:", error);
@@ -135,6 +136,7 @@ export default function BranchTickerOverlay() {
       }
       
       const allItems = (data || []) as TickerItem[];
+      console.log("Overlay fetched items count:", allItems.length);
       const activeNotices = allItems.filter(i => i.type === 'notice' && i.is_active);
       const activeBranches = allItems.filter(i => (i.type === 'branch' || i.type === 'branch_address' || !i.type) && i.is_active);
       
