@@ -127,8 +127,8 @@ export default function BranchTickerOverlay() {
     if (standardNotices.length > 0 && announcements.length > 0) {
       const maxLen = Math.max(standardNotices.length, announcements.length);
       for (let i = 0; i < maxLen; i++) {
-        alternated.push(standardNotices[i % standardNotices.length]);
         alternated.push(announcements[i % announcements.length]);
+        alternated.push(standardNotices[i % standardNotices.length]);
       }
     } else {
       alternated.push(...items);
@@ -234,7 +234,7 @@ export default function BranchTickerOverlay() {
   }, [userId]);
 
   useEffect(() => {
-    if (notices.length <= 1) {
+    if (notices.length === 0) {
       if (noticeIndex !== 0) setNoticeIndex(0);
       return;
     }
@@ -242,13 +242,13 @@ export default function BranchTickerOverlay() {
     const duration = (currentItem?.display_duration || 10) * 1000;
     
     const timer = setTimeout(() => {
-      setNoticeIndex((prev) => (prev + 1) % notices.length);
+      setNoticeIndex((prev) => prev + 1);
     }, duration);
     return () => clearTimeout(timer);
-  }, [notices.length, noticeIndex]); // notices.length is more stable than notices array ref
+  }, [notices.length, noticeIndex]);
 
   useEffect(() => {
-    if (branches.length <= 1) {
+    if (branches.length === 0) {
       if (branchIndex !== 0) setBranchIndex(0);
       return;
     }
@@ -256,7 +256,7 @@ export default function BranchTickerOverlay() {
     const duration = (currentItem?.display_duration || 12) * 1000;
     
     const timer = setTimeout(() => {
-      setBranchIndex((prev) => (prev + 1) % branches.length);
+      setBranchIndex((prev) => prev + 1);
     }, duration);
     return () => clearTimeout(timer);
   }, [branches.length, branchIndex]);
@@ -291,7 +291,7 @@ export default function BranchTickerOverlay() {
               <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20 relative overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div 
-                    key={currentNotice?.category || 'notice'}
+                    key={`${currentNotice?.id}-${noticeIndex}`}
                     initial={{ x: '-100%', opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: '100%', opacity: 0 }}
@@ -307,7 +307,7 @@ export default function BranchTickerOverlay() {
               </div>
               <Marquee 
                 isVisible={!!currentNotice} 
-                id={currentNotice?.id || 'no-notice'}
+                id={`${currentNotice?.id}-${noticeIndex}`}
                 textLength={currentNotice?.top_message.length || 0}
               >
                 <div 
@@ -317,7 +317,7 @@ export default function BranchTickerOverlay() {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  <TypewritingText text={currentNotice?.top_message || ''} />
+                  <TypewritingText text={currentNotice?.top_message || ''} delay={600} />
                 </div>
               </Marquee>
             </motion.div>
@@ -338,7 +338,7 @@ export default function BranchTickerOverlay() {
               <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20 relative overflow-hidden">
                  <AnimatePresence mode="popLayout">
                    <motion.div 
-                     key={currentBranch.id}
+                     key={`${currentBranch?.id}-${branchIndex}`}
                      initial={{ x: '-100%', opacity: 0 }}
                      animate={{ x: 0, opacity: 1 }}
                      exit={{ x: '100%', opacity: 0 }}
@@ -348,14 +348,14 @@ export default function BranchTickerOverlay() {
                         fontSize: 'clamp(22px, 2.6vw, 34px)'
                       }}
                     >
-                      {currentBranch.branch_name}
+                      {currentBranch?.branch_name}
                    </motion.div>
                  </AnimatePresence>
               </div>
               
               <Marquee 
                 isVisible={!!currentBranch} 
-                id={currentBranch?.id || 'no-branch'}
+                id={`${currentBranch?.id}-${branchIndex}`}
                 textLength={(currentBranch?.bottom_message?.length || 0) + (currentBranch?.phone_number?.length || 0)}
               >
                  <div 

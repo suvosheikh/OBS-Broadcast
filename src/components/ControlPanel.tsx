@@ -136,8 +136,8 @@ export default function ControlPanel({ user }: { user: User }) {
     if (standard.length > 0 && announcements.length > 0) {
       const maxLen = Math.max(standard.length, announcements.length);
       for (let i = 0; i < maxLen; i++) {
-        activeNotices.push(standard[i % standard.length]);
         activeNotices.push(announcements[i % announcements.length]);
+        activeNotices.push(standard[i % standard.length]);
       }
     } else {
       activeNotices.push(...activeNoticesRaw);
@@ -148,24 +148,20 @@ export default function ControlPanel({ user }: { user: User }) {
     let noticeTimer: any;
     let branchTimer: any;
 
-    if (activeNotices.length > 1) {
+    if (activeNotices.length > 0) {
       const item = activeNotices[currentNoticeIndex % activeNotices.length];
       const duration = (item?.display_duration || 10) * 1000;
       noticeTimer = setTimeout(() => {
-        setCurrentNoticeIndex((prev) => (prev + 1) % activeNotices.length);
+        setCurrentNoticeIndex((prev) => prev + 1);
       }, duration);
-    } else if (activeNotices.length === 1 && currentNoticeIndex !== 0) {
-      setCurrentNoticeIndex(0);
     }
 
-    if (activeBranches.length > 1) {
+    if (activeBranches.length > 0) {
       const item = activeBranches[currentBranchIndex % activeBranches.length];
       const duration = (item?.display_duration || 12) * 1000;
       branchTimer = setTimeout(() => {
-        setCurrentBranchIndex((prev) => (prev + 1) % activeBranches.length);
+        setCurrentBranchIndex((prev) => prev + 1);
       }, duration);
-    } else if (activeBranches.length === 1 && currentBranchIndex !== 0) {
-      setCurrentBranchIndex(0);
     }
 
     return () => {
@@ -184,8 +180,8 @@ export default function ControlPanel({ user }: { user: User }) {
     if (standard.length > 0 && announcements.length > 0) {
       const maxLen = Math.max(standard.length, announcements.length);
       for (let i = 0; i < maxLen; i++) {
-        alternated.push(standard[i % standard.length]);
         alternated.push(announcements[i % announcements.length]);
+        alternated.push(standard[i % standard.length]);
       }
     } else {
       alternated.push(...raw);
@@ -193,7 +189,10 @@ export default function ControlPanel({ user }: { user: User }) {
     return alternated[currentNoticeIndex % (alternated.length || 1)];
   }, [tickerItems, currentNoticeIndex]);
 
-  const previewBranch = tickerItems.filter(i => i.type === 'branch' && i.is_active)[currentBranchIndex];
+  const previewBranch = useMemo(() => {
+    const raw = tickerItems.filter(i => i.type === 'branch' && i.is_active);
+    return raw[currentBranchIndex % (raw.length || 1)];
+  }, [tickerItems, currentBranchIndex]);
 
   useEffect(() => {
     fetchStats();
@@ -712,14 +711,6 @@ export default function ControlPanel({ user }: { user: User }) {
                       <button onClick={() => setShowNoticeForm(false)} className="text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="md:col-span-2">
-                        <FormInput 
-                          label="Notice Content" 
-                          placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
-                          value={noticeForm.content} 
-                          onChange={v => setNoticeForm({...noticeForm, content: v})} 
-                        />
-                      </div>
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Category</label>
                         <select 
@@ -730,6 +721,14 @@ export default function ControlPanel({ user }: { user: User }) {
                           <option value="notice">নোটিশ (Notice)</option>
                           <option value="announcement">ঘোষণা (Announcement)</option>
                         </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <FormInput 
+                          label="Notice Content" 
+                          placeholder="e.g. বিশেষ ছাড় অফার চলছে..."
+                          value={noticeForm.content} 
+                          onChange={v => setNoticeForm({...noticeForm, content: v})} 
+                        />
                       </div>
                       <FormInput 
                         label="Duration (Sec)" 
