@@ -125,6 +125,109 @@ export default function ControlPanel({ user }: { user: User }) {
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
+  const [globalSettings, setGlobalSettings] = useState<any>({
+    notice_label_font: 'font-noto-sans-bengali',
+    notice_label_size: 28,
+    notice_label_color: '#ffffff',
+    notice_label_bg: '#004a99',
+    notice_content_font: 'font-noto-sans-bengali',
+    notice_content_size: 22,
+    notice_content_color: '#ffffff',
+    notice_content_bg: '#00a651',
+    branch_label_font: 'font-noto-sans-bengali',
+    branch_label_size: 28,
+    branch_label_color: '#ffffff',
+    branch_label_bg: '#00a651',
+    branch_content_font: 'font-noto-sans-bengali',
+    branch_content_size: 22,
+    branch_content_color: '#ffffff',
+    branch_content_bg: '#004a99',
+    time_font: 'font-noto-sans-bengali',
+    time_size: 28,
+    time_color: '#0f172a',
+    time_bg: '#ffc107'
+  });
+
+  useEffect(() => {
+    async function fetchSettingsAll() {
+      const { data } = await supabase
+        .from('settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setGlobalSettings({
+          notice_label_font: data.notice_label_font || 'font-noto-sans-bengali',
+          notice_label_size: data.notice_label_size || 28,
+          notice_label_color: data.notice_label_color || '#ffffff',
+          notice_label_bg: data.notice_label_bg || '#004a99',
+          notice_content_font: data.notice_content_font || 'font-noto-sans-bengali',
+          notice_content_size: data.notice_content_size || 22,
+          notice_content_color: data.notice_content_color || '#ffffff',
+          notice_content_bg: data.notice_content_bg || '#00a651',
+          branch_label_font: data.branch_label_font || 'font-noto-sans-bengali',
+          branch_label_size: data.branch_label_size || 28,
+          branch_label_color: data.branch_label_color || '#ffffff',
+          branch_label_bg: data.branch_label_bg || '#00a651',
+          branch_content_font: data.branch_content_font || 'font-noto-sans-bengali',
+          branch_content_size: data.branch_content_size || 22,
+          branch_content_color: data.branch_content_color || '#ffffff',
+          branch_content_bg: data.branch_content_bg || '#004a99',
+          time_font: data.time_font || 'font-noto-sans-bengali',
+          time_size: data.time_size || 28,
+          time_color: data.time_color || '#0f172a',
+          time_bg: data.time_bg || '#ffc107'
+        });
+      }
+    }
+
+    fetchSettingsAll();
+
+    const settingsChannel = supabase
+      .channel('settings_changes_control_panel')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'settings'
+        },
+        (payload) => {
+          if (payload.new) {
+            const temp = payload.new as any;
+            setGlobalSettings({
+              notice_label_font: temp.notice_label_font || 'font-noto-sans-bengali',
+              notice_label_size: temp.notice_label_size || 28,
+              notice_label_color: temp.notice_label_color || '#ffffff',
+              notice_label_bg: temp.notice_label_bg || '#004a99',
+              notice_content_font: temp.notice_content_font || 'font-noto-sans-bengali',
+              notice_content_size: temp.notice_content_size || 22,
+              notice_content_color: temp.notice_content_color || '#ffffff',
+              notice_content_bg: temp.notice_content_bg || '#00a651',
+              branch_label_font: temp.branch_label_font || 'font-noto-sans-bengali',
+              branch_label_size: temp.branch_label_size || 28,
+              branch_label_color: temp.branch_label_color || '#ffffff',
+              branch_label_bg: temp.branch_label_bg || '#00a651',
+              branch_content_font: temp.branch_content_font || 'font-noto-sans-bengali',
+              branch_content_size: temp.branch_content_size || 22,
+              branch_content_color: temp.branch_content_color || '#ffffff',
+              branch_content_bg: temp.branch_content_bg || '#004a99',
+              time_font: temp.time_font || 'font-noto-sans-bengali',
+              time_size: temp.time_size || 28,
+              time_color: temp.time_color || '#0f172a',
+              time_bg: temp.time_bg || '#ffc107'
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+    };
+  }, []);
+  
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -896,24 +999,42 @@ export default function ControlPanel({ user }: { user: User }) {
                   
                   <div className="flex-1 w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/5 p-1 min-h-[80px] flex items-center justify-center">
                     <div className="w-full h-[60px] bg-slate-800 flex flex-col pointer-events-none origin-center">
-                       <div className="h-1/2 bg-[#00a651] flex items-center border-b border-white/5">
-                          <div className="w-[80px] h-full bg-[#004a99] flex items-center justify-center">
-                             <span className="text-white font-black text-xs italic font-bangla">
+                       <div 
+                         className="h-1/2 flex items-center border-b border-white/5"
+                         style={{ backgroundColor: globalSettings.notice_content_bg }}
+                       >
+                          <div 
+                            className="w-[80px] h-full flex items-center justify-center"
+                            style={{ backgroundColor: globalSettings.notice_label_bg }}
+                          >
+                             <span className={cn("font-black text-xs italic", globalSettings.notice_label_font)} style={{ color: globalSettings.notice_label_color }}>
                                {(previewNotice?.category === 'announcement' || noticeForm.category === 'announcement') ? 'ঘোষণা' : 'নোটিশ'}
                              </span>
                           </div>
-                          <div className="flex-1 px-4 text-white text-xs font-bold truncate font-bangla">
+                          <div 
+                            className={cn("flex-1 px-4 font-bold truncate", globalSettings.notice_content_font)}
+                            style={{ color: globalSettings.notice_content_color, fontSize: '11px' }}
+                          >
                              {previewNotice?.top_message || noticeForm.content || '...'}
                           </div>
                        </div>
-                       <div className="h-1/2 bg-[#004a99] flex items-center">
-                          <div className="w-[80px] bg-[#00a651] h-full flex items-center justify-center text-center">
-                             <span className="text-white font-bold text-[10px] px-2 whitespace-nowrap overflow-hidden font-bangla">
+                       <div 
+                         className="h-1/2 flex items-center"
+                         style={{ backgroundColor: globalSettings.branch_content_bg }}
+                       >
+                          <div 
+                            className="w-[80px] h-full flex items-center justify-center text-center"
+                            style={{ backgroundColor: globalSettings.branch_label_bg }}
+                          >
+                             <span className={cn("font-bold text-[10px] px-2 whitespace-nowrap overflow-hidden", globalSettings.branch_label_font)} style={{ color: globalSettings.branch_label_color }}>
                                {previewBranch?.branch_name || branchForm.name || 'BRANCH'}
                              </span>
                           </div>
                           <div className="flex-1 px-4 text-white flex items-center overflow-hidden">
-                             <div className="text-[10px] font-medium truncate font-bangla flex items-center gap-1">
+                             <div 
+                               className={cn("text-[10px] font-medium truncate flex items-center gap-1", globalSettings.branch_content_font)}
+                               style={{ color: globalSettings.branch_content_color }}
+                             >
                                 {(() => {
                                    const addr = previewBranch?.bottom_message || branchForm.address || 'Address Area';
                                    const phone = previewBranch?.phone_number || branchForm.phone;
@@ -931,10 +1052,16 @@ export default function ControlPanel({ user }: { user: User }) {
                                 })()}
                              </div>
                           </div>
-                          <div className="w-[60px] bg-[#ffc107] h-full flex items-center justify-center">
-                             <span className="text-slate-900 font-bold text-[10px]">
-                               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-                             </span>
+                          <div 
+                             className="w-[60px] h-full flex items-center justify-center shrink-0 border-l border-white/5"
+                             style={{ backgroundColor: globalSettings.time_bg || '#ffc107' }}
+                           >
+                              <span 
+                                className={cn("font-bold text-[10px] truncate px-1", globalSettings.time_font)}
+                                style={{ color: globalSettings.time_color || '#0f172a' }}
+                              >
+                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                              </span>
                           </div>
                        </div>
                     </div>

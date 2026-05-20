@@ -107,7 +107,27 @@ export default function BranchTickerOverlay() {
   const [time, setTime] = useState(new Date());
   const [globalSettings, setGlobalSettings] = useState({
     notice_section_enabled: true,
-    branch_section_enabled: true
+    branch_section_enabled: true,
+    notice_label_font: 'font-noto-sans-bengali',
+    notice_label_size: 28,
+    notice_label_color: '#ffffff',
+    notice_label_bg: '#004a99',
+    notice_content_font: 'font-noto-sans-bengali',
+    notice_content_size: 22,
+    notice_content_color: '#ffffff',
+    notice_content_bg: '#00a651',
+    branch_label_font: 'font-noto-sans-bengali',
+    branch_label_size: 28,
+    branch_label_color: '#ffffff',
+    branch_label_bg: '#00a651',
+    branch_content_font: 'font-noto-sans-bengali',
+    branch_content_size: 22,
+    branch_content_color: '#ffffff',
+    branch_content_bg: '#004a99',
+    time_font: 'font-noto-sans-bengali',
+    time_size: 28,
+    time_color: '#0f172a',
+    time_bg: '#ffc107'
   });
 
   const notices = useMemo(() => {
@@ -161,7 +181,27 @@ export default function BranchTickerOverlay() {
       if (data) {
         setGlobalSettings({
           notice_section_enabled: data.notice_section_enabled,
-          branch_section_enabled: data.branch_section_enabled
+          branch_section_enabled: data.branch_section_enabled,
+          notice_label_font: data.notice_label_font || 'font-noto-sans-bengali',
+          notice_label_size: data.notice_label_size || 28,
+          notice_label_color: data.notice_label_color || '#ffffff',
+          notice_label_bg: data.notice_label_bg || '#004a99',
+          notice_content_font: data.notice_content_font || 'font-noto-sans-bengali',
+          notice_content_size: data.notice_content_size || 22,
+          notice_content_color: data.notice_content_color || '#ffffff',
+          notice_content_bg: data.notice_content_bg || '#00a651',
+          branch_label_font: data.branch_label_font || 'font-noto-sans-bengali',
+          branch_label_size: data.branch_label_size || 28,
+          branch_label_color: data.branch_label_color || '#ffffff',
+          branch_label_bg: data.branch_label_bg || '#00a651',
+          branch_content_font: data.branch_content_font || 'font-noto-sans-bengali',
+          branch_content_size: data.branch_content_size || 22,
+          branch_content_color: data.branch_content_color || '#ffffff',
+          branch_content_bg: data.branch_content_bg || '#004a99',
+          time_font: data.time_font || 'font-noto-sans-bengali',
+          time_size: data.time_size || 28,
+          time_color: data.time_color || '#0f172a',
+          time_bg: data.time_bg || '#ffc107'
         });
       }
     }
@@ -215,7 +255,27 @@ export default function BranchTickerOverlay() {
             const newSettings = payload.new as any;
             setGlobalSettings({
               notice_section_enabled: newSettings.notice_section_enabled,
-              branch_section_enabled: newSettings.branch_section_enabled
+              branch_section_enabled: newSettings.branch_section_enabled,
+              notice_label_font: newSettings.notice_label_font || 'font-noto-sans-bengali',
+              notice_label_size: newSettings.notice_label_size || 28,
+              notice_label_color: newSettings.notice_label_color || '#ffffff',
+              notice_label_bg: newSettings.notice_label_bg || '#004a99',
+              notice_content_font: newSettings.notice_content_font || 'font-noto-sans-bengali',
+              notice_content_size: newSettings.notice_content_size || 22,
+              notice_content_color: newSettings.notice_content_color || '#ffffff',
+              notice_content_bg: newSettings.notice_content_bg || '#00a651',
+              branch_label_font: newSettings.branch_label_font || 'font-noto-sans-bengali',
+              branch_label_size: newSettings.branch_label_size || 28,
+              branch_label_color: newSettings.branch_label_color || '#ffffff',
+              branch_label_bg: newSettings.branch_label_bg || '#00a651',
+              branch_content_font: newSettings.branch_content_font || 'font-noto-sans-bengali',
+              branch_content_size: newSettings.branch_content_size || 22,
+              branch_content_color: newSettings.branch_content_color || '#ffffff',
+              branch_content_bg: newSettings.branch_content_bg || '#004a99',
+              time_font: newSettings.time_font || 'font-noto-sans-bengali',
+              time_size: newSettings.time_size || 28,
+              time_color: newSettings.time_color || '#0f172a',
+              time_bg: newSettings.time_bg || '#ffc107'
             });
             // Force re-fetch items to ensure indices are correct if something was disabled
             fetchItems();
@@ -286,9 +346,13 @@ export default function BranchTickerOverlay() {
               animate={{ height: 'max(60px, 6vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 1 }}
               transition={{ duration: 0.4 }}
-              className="bg-[#00a651] flex items-center overflow-hidden border-b border-white/10"
+              className="flex items-center overflow-hidden border-b border-white/10"
+              style={{ backgroundColor: globalSettings.notice_content_bg }}
             >
-              <div className="w-[12%] bg-[#004a99] h-full flex items-center justify-center shrink-0 border-r border-[#00a651] z-20 relative overflow-hidden">
+              <div 
+                className="w-[12%] h-full flex items-center justify-center shrink-0 border-r border-[#000000]/10 z-20 relative overflow-hidden"
+                style={{ backgroundColor: globalSettings.notice_label_bg }}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div 
                     key={`${currentNotice?.id}-${noticeIndex}`}
@@ -296,9 +360,10 @@ export default function BranchTickerOverlay() {
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: '100%', opacity: 0 }}
                     transition={{ duration: 0.5, ease: "easeInOut" }}
-                    className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.2] font-bangla w-full h-full flex items-center justify-center break-words"
+                    className={cn("absolute font-bold tracking-tight text-center px-1 leading-[1.2] w-full h-full flex items-center justify-center break-words", globalSettings.notice_label_font)}
                     style={{ 
-                      fontSize: 'clamp(22px, 2.6vw, 34px)'
+                      color: globalSettings.notice_label_color,
+                      fontSize: `${globalSettings.notice_label_size}px`
                     }}
                   >
                     {currentNotice?.category === 'announcement' ? 'ঘোষণা' : 'নোটিশ'}
@@ -311,9 +376,10 @@ export default function BranchTickerOverlay() {
                 textLength={currentNotice?.top_message.length || 0}
               >
                 <div 
-                  className="font-medium tracking-tight font-bangla flex items-center gap-4 text-white"
+                  className={cn("font-medium tracking-tight flex items-center gap-4", globalSettings.notice_content_font)}
                   style={{ 
-                    fontSize: 'clamp(16px, 2.2vw, 30px)',
+                    color: globalSettings.notice_content_color,
+                    fontSize: `${globalSettings.notice_content_size}px`,
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -333,9 +399,13 @@ export default function BranchTickerOverlay() {
               animate={{ height: 'max(60px, 6vh)', opacity: 1 }}
               exit={{ height: 0, opacity: 1 }}
               transition={{ duration: 0.4 }}
-              className="bg-[#004a99] flex items-center overflow-hidden"
+              className="flex items-center overflow-hidden"
+              style={{ backgroundColor: globalSettings.branch_content_bg }}
             >
-              <div className="w-[12%] bg-[#00a651] h-full flex items-center justify-center shrink-0 border-r border-[#004a99] z-20 relative overflow-hidden">
+              <div 
+                className="w-[12%] h-full flex items-center justify-center shrink-0 border-r border-[#000000]/10 z-20 relative overflow-hidden"
+                style={{ backgroundColor: globalSettings.branch_label_bg }}
+              >
                  <AnimatePresence mode="popLayout">
                    <motion.div 
                      key={`${currentBranch?.id}-${branchIndex}`}
@@ -343,9 +413,10 @@ export default function BranchTickerOverlay() {
                      animate={{ x: 0, opacity: 1 }}
                      exit={{ x: '100%', opacity: 0 }}
                      transition={{ duration: 0.5, ease: "easeInOut" }}
-                     className="absolute text-white font-bold tracking-tight text-center px-1 leading-[1.1] font-bangla w-full h-full flex items-center justify-center break-words"
+                     className={cn("absolute font-bold tracking-tight text-center px-1 leading-[1.1] w-full h-full flex items-center justify-center break-words", globalSettings.branch_label_font)}
                       style={{ 
-                        fontSize: 'clamp(22px, 2.6vw, 34px)'
+                        color: globalSettings.branch_label_color,
+                        fontSize: `${globalSettings.branch_label_size}px`
                       }}
                     >
                       {currentBranch?.branch_name}
@@ -359,9 +430,10 @@ export default function BranchTickerOverlay() {
                 textLength={(currentBranch?.bottom_message?.length || 0) + (currentBranch?.phone_number?.length || 0)}
               >
                  <div 
-                  className="font-medium tracking-tight font-bangla flex items-center gap-4 text-white"
+                  className={cn("font-medium tracking-tight flex items-center gap-4", globalSettings.branch_content_font)}
                   style={{ 
-                    fontSize: 'clamp(16px, 2.2vw, 30px)',
+                    color: globalSettings.branch_content_color,
+                    fontSize: `${globalSettings.branch_content_size}px`,
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -373,7 +445,10 @@ export default function BranchTickerOverlay() {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: (currentBranch.bottom_message.length * 30 / 1000) + 0.8 }}
                       >
-                        <Square className="w-[0.4em] h-[0.4em] fill-white text-white" />
+                        <Square 
+                          className="w-[0.4em] h-[0.4em]" 
+                          style={{ fill: globalSettings.branch_content_color, color: globalSettings.branch_content_color }} 
+                        />
                       </motion.div>
                       <TypewritingText 
                         text={currentBranch.phone_number}
@@ -385,27 +460,39 @@ export default function BranchTickerOverlay() {
               </Marquee>
 
               {/* Clock Section with Scrolling Animation */}
-              <div className="bg-[#ffc107] h-full flex items-center justify-center shrink-0 z-20 px-3 overflow-hidden min-w-fit">
-                <div className="flex items-center text-slate-900 font-black text-[max(1.8vw,16px)] tracking-tighter whitespace-nowrap">
-                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase().split('').map((char, i) => (
-                     <div key={i} className={`relative h-[max(2.5vw,24px)] flex justify-center overflow-hidden ${char === ' ' || char === '\u00A0' ? 'w-[0.2em]' : (char === ':' ? 'w-[0.3em]' : (char === 'M' || char === 'W' ? 'w-[0.85em]' : 'w-[0.65em]'))}`}>
-                        <AnimatePresence mode="popLayout">
-                           <motion.span
-                             key={`${char}-${i}`}
-                             initial={{ y: '100%' }}
-                             animate={{ y: 0 }}
-                             exit={{ y: '-100%' }}
-                             transition={{ 
-                               duration: 0.4, 
-                               ease: [0.23, 1, 0.32, 1] 
-                             }}
-                             className="absolute"
-                           >
-                             {char}
-                           </motion.span>
-                        </AnimatePresence>
-                     </div>
-                   ))}
+              <div 
+                className="h-full flex items-center justify-center shrink-0 z-20 px-3 overflow-hidden min-w-fit"
+                style={{ backgroundColor: globalSettings.time_bg }}
+              >
+                <div 
+                  className={cn("flex items-center tracking-tighter whitespace-nowrap font-black", globalSettings.time_font)}
+                  style={{ 
+                    color: globalSettings.time_color,
+                    fontSize: `${globalSettings.time_size}px`
+                  }}
+                >
+                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase().split('').map((char, i) => {
+                     const containerHeightPx = globalSettings.time_size * 1.35;
+                     return (
+                      <div key={i} style={{ height: `${containerHeightPx}px` }} className={`relative flex justify-center overflow-hidden ${char === ' ' || char === '\u00A0' ? 'w-[0.2em]' : (char === ':' ? 'w-[0.3em]' : (char === 'M' || char === 'W' ? 'w-[0.85em]' : 'w-[0.65em]'))}`}>
+                         <AnimatePresence mode="popLayout">
+                            <motion.span
+                              key={`${char}-${i}`}
+                              initial={{ y: '100%' }}
+                              animate={{ y: 0 }}
+                              exit={{ y: '-100%' }}
+                              transition={{ 
+                                duration: 0.4, 
+                                ease: [0.23, 1, 0.32, 1] 
+                              }}
+                              className="absolute"
+                            >
+                              {char}
+                            </motion.span>
+                         </AnimatePresence>
+                      </div>
+                     );
+                   })}
                 </div>
               </div>
             </motion.div>

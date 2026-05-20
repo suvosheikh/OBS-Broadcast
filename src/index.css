@@ -1,10 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Anek+Bangla:wght@100..800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alkatra:wght@400;700&family=Baloo+Da+2:wght@400;500;700&family=Galada&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;500;700;900&family=Noto+Sans+Bengali:wght@400;700&family=Noto+Serif+Bengali:wght@400;700&family=Open+Sans:wght@400;600;700&family=Oswald:wght@400;700&family=Raleway:wght@400;700&family=Roboto:wght@400;500;700&family=Tiro+Bangla&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-bangla: "Anek Bangla", sans-serif;
-  --font-serif: "Cormorant Garamond", serif;
+  --font-noto-sans-bengali: "Noto Sans Bengali", sans-serif;
+  --font-noto-serif-bengali: "Noto Serif Bengali", serif;
+  --font-baloo-da-2: "Baloo Da 2", "Noto Sans Bengali", sans-serif;
+  --font-galada: "Galada", cursive;
+  --font-alkatra: "Alkatra", sans-serif;
+  --font-tiro-bangla: "Tiro Bangla", serif;
+  --font-google-sans: "Google Sans", "Inter", sans-serif;
+  --font-google-sans-flex: "Google Sans Flex", "Google Sans", "Inter", sans-serif;
+  --font-roboto: "Roboto", sans-serif;
+  --font-open-sans: "Open Sans", sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+  --font-montserrat-bold: "Montserrat", sans-serif;
+  --font-oswald: "Oswald", sans-serif;
+  --font-raleway: "Raleway", sans-serif;
+  --font-lora: "Lora", serif;
+
+  /* Compatibility mappings for previous settings */
+  --font-bangla: "Noto Sans Bengali", sans-serif;
+  --font-serif: "Noto Serif Bengali", serif;
 }
 
 :root {
